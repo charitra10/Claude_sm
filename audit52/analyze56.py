@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """analyze56.py DIR [DIR ...] [--fresh] [--by-map --k=metric ...]: behavioural audit of the v5.6 modules (see
-strategyV_5_9e.md). Same layout as analyze.py: one column per run directory, cached in DIR/audit56.json.
+strategyV_5_9_audit56.md). Same layout as analyze.py: one column per run directory, cached in DIR/audit56.json.
 
 F_DRY_EVICT     dry_*: turns / stays of non-alpha dragons in a small chamber with no pearl and no spawn due within 24
                 rounds (ground truth from the replay's spawn timers); re-entries by teammates after a dry exit.

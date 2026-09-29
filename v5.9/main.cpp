@@ -282,7 +282,7 @@ constexpr bool F_RESERVE_AIM = false; // measured: settled-chamber entries 125 -
 constexpr bool F_RESERVE_ALL = false; // reserve every portal of the chamber we hold, in rotation (default: 90 vs 43 settled-chamber
                                      // entries in 4 games, worse: off)
 
-// v5.9e: fixes from the behavioural audit of the v5.6 modules (audit52/analyze56.py, strategyV_5_9e.md).
+// audit56: fixes from the behavioural audit of the v5.6 modules (audit52/analyze56.py, strategyV_5_9_audit56.md).
 // F_SYMMETRY: inference is right (0 wrong of 12000 resolutions / adoptions in 72 games), but newborns learn it late: about
 // 9 rounds after birth, and 21% never do. F_SYM_HANDOFF gives a split child the symmetry from its parent on the split turn
 // (the beam into our own body refracts out of the tail into the child), on beams no other hand-off is using. Measured:
@@ -6824,7 +6824,7 @@ class Brain {
                 s.probe_dir = s.probe_plan_dir;
                 DIAG("probesend " << c.get_id() << ' ' << round << " at " << post.x << ',' << post.y << " dir " << s.probe_dir);
             }
-            // v5.9e (F_SYM_HANDOFF): our split child is born knowing nothing; hand it the map symmetry on the beams that
+            // audit56 (F_SYM_HANDOFF): our split child is born knowing nothing; hand it the map symmetry on the beams that
             // refract into it and carry no other hand-off.
             if (F_SYMMETRY && F_SYM_HANDOFF && a.child && s.sym >= 0 && !critical && !uniform_map()) {
                 int hits = beams_into_child(a.child);

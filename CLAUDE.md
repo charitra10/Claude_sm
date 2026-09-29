@@ -32,7 +32,7 @@ C++ bots for **UNSW Battlecode** (a snake-like "dragons" game on a toroidal grid
   replays, independently of win rate), the fixes made in `v5.9/main.cpp` ("v5.9d" flag block: `F_HAZARD_CLOSED`,
   `F_AMEM_FIX`; the `F_CYCLE` / `F_FEED_BACKOFF` ablations were broken and are fixed), and fresh-seed results. Tools in
   `audit52/` (see its README), raw results in `bench59d/`.
-- `strategyV_5_9e.md`: the same audit for the v5.6 modules (`F_DRY_EVICT`, `F_CHOKE_GREEDY`, `F_REENTRY`, `F_SYMMETRY`;
+- `strategyV_5_9_audit56.md`: the same audit for the v5.6 modules (`F_DRY_EVICT`, `F_CHOKE_GREEDY`, `F_REENTRY`, `F_SYMMETRY`;
   `F_MIRROR_SCOUT` skipped as rewritten by v5.7/v5.8): all do their job, `F_CHOKE_GREEDY` clearly pays; fixes tried
   (`F_DRY_SKIP`, `F_SYM_HANDOFF`) did not and are not shipped. Tool `audit52/analyze56.py`, data in `bench59d/audit56/`.
 - `replay_tools/`: decoder and analysis scripts for `.replay` files (packed Cap'n Proto): full board per turn, deaths by

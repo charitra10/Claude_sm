@@ -1,4 +1,4 @@
-# v5.9e: do the v5.6 modules do what they were built to do?
+# v5.9 audit of the v5.6 modules: do they do what they were built to do?
 
 Second part of the behavioural audit (the first, `strategyV_5_9d.md`, covered the v5.2 modules). The v5.6 modules were
 kept on win rate within noise (`strategyV_5_6.md`: "they do what was asked (traces below)", checked on a few seeds). Here
@@ -91,6 +91,6 @@ not shipped, so the shipped v5.9 behaves exactly as v5.9d.
 
 ## Code changes in v5.9/main.cpp
 
-- New block "v5.9e" after v5.9d: `F_SYM_HANDOFF` (off). With it off the shipped build behaves exactly as v5.9d.
+- New block "audit56" after v5.9d: `F_SYM_HANDOFF` (off). With it off the shipped build behaves exactly as v5.9d.
 - `F_DRY_SKIP` was tried and removed.
 - New `DIAG` line `symhand`; `audit52/analyze56.py`.
