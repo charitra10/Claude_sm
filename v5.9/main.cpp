@@ -68,6 +68,8 @@ constexpr int PORTAL_RESIDENCY = 4;
 constexpr bool F_SPAWN_CASCADE = true; // round 0: split L-2 again and again, so every spawn body is 2-long units at once
 constexpr bool F_REVERSE_SPLIT = true; // no move that survives: split L-2 (the 2-long head dies), even across a portal
 constexpr bool F_CAMP = true;          // stay in a portal chamber while its pearls are due; one dragon per chamber
+// (Audit: F_CAMP has no effect while F_CAMP2 is on: F_CAMP2 recomputes both `idle` and `crowded`. Every game is identical
+// with it off. Camping as it runs now is F_CAMP2 + F_DRY_EVICT.)
 constexpr bool F_PORTAL_LOOP = true;   // walked out of a dense chamber: loop round the partner edge and go back in
 constexpr bool F_CHAIN = true;         // leave a chamber by a portal we did not just use (chained rooms, no ping-pong)
 constexpr bool F_PORTAL_TRAP = true;   // never cross a portal into a dead cell; a portal with dead cells on both sides is barred
@@ -77,6 +79,12 @@ constexpr bool F_GATE_REACH = true;    // (part of F_FEED_GATE) ...and only wher
 constexpr bool F_TRUE_LEN = true;      // track alphas' real lengths (v5.3 floored every sonar report at 8)
 constexpr bool F_SURPLUS = true;       // feeders the apex cannot use yet take value trades instead of circling
 constexpr int CAMP_HORIZON = 30, LOOP_CHAMBER = 8, LOOP_TTL = 12, CHAIN_MEMORY = 4, CHAIN_PENALTY = 12;
+// Audit of the v5.4 modules (audit54/, strategyV_5_9_audit54.md): fixes where a module did not do what it was built for.
+constexpr bool F_CASCADE_EXIT = true;  // round 0: a cascade child too short to split on is not born where it cannot move
+constexpr bool F_RESCUE_GATE = true;   // a trapped feeder skips its rescue split only when the feed gate lets it deliver
+constexpr bool F_FAMILY_PORTAL = true; // a newborn with its tail on a portal tile keeps out of that portal (its parent is behind it)
+constexpr bool F_BARRED_AIM = true;    // the barred-portal hand-off to a split child is aimed at the child, and shares beams
+constexpr int FAMILY_TTL = 20, FAMILY_TTL_EVAC = 0; // an evacuee (born inside) leaves at once: its parent keeps out
 
 // v5.5 modules, switchable the same way.
 constexpr bool F_CHOKE = true;        // dead ends and sonar hazard mouths: only a 2-long dragon enters, and only for live pearls
@@ -419,6 +427,11 @@ struct DragonState {
     int chamber_portal = -1, chamber_round = -1000; // last round we were inside a dense portal chamber, and its portal
     int chamber_size = 0;
     int loop_portal = -1, loop_until = -1000;       // forced out of that chamber: go back in through the same portal
+    bool dead_known = false;                        // audit (F_BARRED_AIM): a barred portal of ours leads into a dead cell
+    int handoff_until = -1000;                      // audit (F_BARRED_AIM): keep handing the barred set to our split child
+    bool pending_knew = false;
+    int dbg_legal = -1;                             // audit trace: legal moves this turn (-1: not computed)                      // audit trace: that portal was barred when we took it
+    int family_portal = -1, family_until = -1000;   // audit (F_FAMILY_PORTAL): the portal our parent's body went through
     int dead_alarm = -1;                            // we came out in a dead cell of this portal: warn on every beam
     int news_portal = -1, news_until = -1000;       // just learnt this portal is barred: pass it on at once
     std::array<std::pair<int, int>, CHAIN_MEMORY> used_portals{}; // (portal id, round) of our latest crossings
@@ -969,7 +982,9 @@ class Brain {
 
     std::uint64_t barred_packet() const {
         std::uint64_t sig = (c.get_team() == Team::A) ? 1ULL : 2ULL;
-        return (sig << 62) | (static_cast<std::uint64_t>(BARRED_TAG) << 49) | barred_mask();
+        // audit: bit 32 says some of these portals lead into dead cells (not only barren chambers): relay it faster
+        return (sig << 62) | (static_cast<std::uint64_t>(BARRED_TAG) << 49) | (s.dead_known && F_BARRED_AIM ? 1ULL << 32 : 0) |
+               barred_mask();
     }
 
     // v5.6: a mirrored hotspot (value 0: only our symmetry, no spot).
@@ -1857,6 +1872,23 @@ class Brain {
             if (s.alpha) s.mantle_round = round;
         }
         s.evacuating = !s.alpha && c.get_id() > 1 && enclosed_nursery();
+        // Audit fix (F_FAMILY_PORTAL): born with our tail on a portal tile, the rest of our parent's body went through that
+        // portal (a straddle split, v5.8): our parent is right behind it, usually camping or looping in a 2x2 chamber. Keep
+        // out of it for a while. On portals such children walked straight back in and met their parent head-on on the
+        // landing tile (~25 parent-child head-ons a game; a probe cannot see it: the looper steps onto that tile the same
+        // round, before the child moves).
+        if (F_FAMILY_PORTAL && round > 0) {
+            Position tail, neck;
+            if (tail_and_neck(tail, neck))
+                for (int e = 0; e < 4; ++e) {
+                    int edge = s.cells[index(tail)].edge[e];
+                    if (edge <= 0) continue;
+                    s.family_portal = edge - 1;
+                    s.family_until = round + (s.evacuating ? FAMILY_TTL_EVAC : FAMILY_TTL);
+                    if (s.evacuating && FAMILY_TTL_EVAC <= 0) s.family_portal = -1;
+                    DIAG("family " << c.get_id() << ' ' << round << " pid " << edge - 1 << " evac " << s.evacuating);
+                }
+        }
 
         // v5.7 (a2): sectors by a hash of the ID. By id / 2, teammates 2k and 2k + 1 chased the same waypoints.
         s.sector = F_SECTOR_HASH ? static_cast<int>(mix(static_cast<std::uint32_t>(c.get_id()) * 2654435761U) % 8)
@@ -2093,6 +2125,7 @@ class Brain {
                     if (ahead < 0 || behind < 0) continue;
                     port.trap_checked = true;
                     if (ahead == 1 && behind == 1) {
+                        s.dead_known = true;
                         if (!port.barren) note_news(port.id);
                         port.barren = port.occupied = true;
                         DIAG("deadportal " << c.get_id() << ' ' << round << ' ' << port.id);
@@ -2157,6 +2190,7 @@ class Brain {
         for (auto msg : c.get_sonar_messages()) {
             if ((msg >> 62) != team_sig) continue;
             if (static_cast<int>((msg >> 49) & SONAR_ID_MASK) == BARRED_TAG) {
+                if ((msg >> 32) & 1ULL) s.dead_known = true;
                 for (int pid = 0; pid < 32; ++pid) {
                     if (!((msg >> pid) & 1ULL)) continue;
                     auto &port = portal(pid);
@@ -2389,7 +2423,11 @@ class Brain {
             // We came out in a dead cell: bar the portal for the team (a split lets the rear live to say so).
             if (F_PORTAL_TRAP && dead_cell(here, di(c.get_dir())) == 1) {
                 auto &port = portal(s.pending_portal);
+                DIAG("deadcellknew " << c.get_id() << ' ' << round << ' ' << port.id << " barren " << s.pending_knew << " mode "
+                                     << name(s.last_mode) << " evict " << s.evicting << " evac " << s.evacuating << " born "
+                                     << s.born);
                 port.barren = port.occupied = true;
+                s.dead_known = true;
                 if (port.id < 32) s.dead_alarm = port.id;
                 note_news(port.id);
                 from_chamber = false;
@@ -2602,6 +2640,10 @@ class Brain {
         if (pid < 0 || pid >= 32) return;
         s.news_portal = pid;
         s.news_until = round + 1;
+    }
+
+    bool family_portal(int id) const {
+        return F_FAMILY_PORTAL && id >= 0 && id == s.family_portal && round <= s.family_until;
     }
 
     // The portal of the tiny chamber we are harvesting: ours to cross, whatever the occupancy flags say.
@@ -2960,6 +3002,28 @@ class Brain {
             if (!t || !t->get_dragon()) ++n;
         }
         return n;
+    }
+
+    // Audit fix (F_CASCADE_EXIT): child_exits() in round 0, where more is known. A dragon born in the round-0 cascade has
+    // its parent's tail next to its own tail, and the parent has not moved (it spent its turn splitting). So unless a
+    // teammate segment is already seen next to our tail, one of the unseen tiles there is the parent (autarky: the tile
+    // beyond the tail is 4 away, out of view, and child_exits() counted it as free).
+    int cascade_child_exits() const {
+        Position tail, neck;
+        if (!tail_and_neck(tail, neck)) return 1;
+        int free_seen = 0, unseen = 0;
+        bool mate = false;
+        for (int e = 0; e < 4; ++e) {
+            if (step(tail, e) == neck) continue;
+            int edge = s.cells[index(tail)].edge[e];
+            if (edge < 0) continue;
+            if (edge > 0) { ++free_seen; continue; }
+            auto t = c.get_tile(step(tail, e));
+            if (!t) ++unseen;
+            else if (!t->get_dragon()) ++free_seen;
+            else if (t->get_dragon()->get_team() == c.get_team()) mate = true;
+        }
+        return free_seen + (mate ? unseen : std::max(0, unseen - 1));
     }
 
     // v5.9b (F_SPLIT_ONCE, trauma rounds 45, 106, 212, 276): we were born in a rescue split a moment ago and are stuck
@@ -3386,6 +3450,7 @@ class Brain {
         if (edge < 0) return false;
 
         if (edge > 0) {
+            if (family_portal(edge - 1)) return false;
             if (!s.evicting && !own_portal(edge - 1) &&
                 (s.resident || (portal_occupied(edge - 1) && !s.evacuating && !roam_portal(edge - 1))))
                 return false;
@@ -4709,6 +4774,7 @@ class Brain {
                 if (e <= 0 || distance[index(p)] == INF || (p != here && t.get_dragon())) continue;
                 if (only_id >= 0 && e - 1 != only_id) continue;
                 if (portal_into_dead_cell(p, d)) continue;
+                if (!force && family_portal(e - 1)) continue;
                 if (!force && !s.evacuating && portal_occupied(e - 1) && !roam_portal(e - 1)) continue;
                 if (!force && !s.evacuating && !s.evicting) {
                     const auto &pp = portal_const(e - 1);
@@ -5043,6 +5109,32 @@ class Brain {
         return a;
     }
 
+    // Only drop our pearls where the apex will eat them: it must look like a real apex (not a 2-long dragon still carrying
+    // an old alpha ID), be able to walk to us, have the time to, and have no enemy head closer to the drop than itself.
+    // (Moved out of the feeder delivery so the rescue split can ask the same question.)
+    bool feed_gate_ok(const DragonPart &f, bool log) const {
+        int gap = dist(here, f.position);
+        bool reach = gap <= 2 || !F_GATE_REACH;
+        int best_k = INF;
+        for (int d = 0; d < 4; ++d) {
+            Position n = step(f.position, d);
+            auto tn = c.get_tile(n);
+            bool ours = tn && tn->get_dragon() && tn->get_dragon()->get_id() == c.get_id();
+            best_k = std::min(best_k, ours ? 0 : distance[index(n)]);
+        }
+        if (best_k <= gap + 2) reach = true;
+        bool contested = false;
+        for (const auto &e : enemies)
+            if (dist(e.position, here) <= gap) contested = true;
+        bool real = friendly_visible_length(f.get_id()) >= 3 || body_leaves_view(f.get_id());
+        bool in_time = 500 - round >= gap + 2;
+        bool ok = reach && real && in_time && !contested;
+        if (!ok && log)
+            DIAG("feedgate " << c.get_id() << ' ' << round << ' ' << reach << real << in_time << contested << ' ' << gap << ' '
+                             << best_k << ' ' << friendly_visible_length(f.get_id()) << ' ' << chebyshev(here, f.position));
+        return ok;
+    }
+
     Action decide_core() {
         observe();
         paths();
@@ -5125,6 +5217,23 @@ class Brain {
         // the cascade's own units already at alpha_split_cap(), counted as growing: it stopped cascading (slithery_fight).
         if (F_SPAWN_CASCADE && round == 0 && (F_CASCADE_FIX || !s.growing) && c.get_length() >= 4 &&
             c.can_split(c.get_length() - 2)) {
+            // Audit fix (F_CASCADE_EXIT): nobody moves in round 0 but the last child of each cascade (every lower ID spent
+            // its turn splitting), so a child too short to split on (< 4) must walk, and in a 1-wide spawn corridor it is
+            // born facing a sibling's tail with kelp beside it (autarky's 14-long spawn: one 2-long child died there in every
+            // game, both teams). Then we walk instead, if we can, and split from round 1.
+            int cd = -1;
+            if (F_CASCADE_EXIT && c.get_length() - 2 < 4 && cascade_child_exits() == 0) {
+                int best = -1;
+                for (int d = 0; d < 4; ++d) {
+                    if (!is_step_safe(d) || s.cells[index(here)].edge[d] != 0) continue;
+                    int sc = forward_escape_count(step(here, d), d);
+                    if (sc > best) { best = sc; cd = d; }
+                }
+            }
+            if (cd >= 0) {
+                DIAG("cascadewalk " << c.get_id() << ' ' << c.get_length() << ' ' << here.x << ',' << here.y);
+                return {{DIRS[cd]}, 0, Mode::Cascade, false};
+            }
             DIAG("cascade " << c.get_id() << ' ' << c.get_length() << ' ' << here.x << ',' << here.y);
             return {{}, c.get_length() - 2, Mode::Cascade, false};
         }
@@ -5314,9 +5423,14 @@ class Brain {
         if (F_REVERSE_SPLIT && c.get_length() >= 4 && survival_moves() == 0 && c.can_split(c.get_length() - 2) &&
             !resplit_doomed()) {
             bool delivering = false;
+            // Audit fix (F_RESCUE_GATE): only when the drop will really be made. The delivery below refuses one the feed gate
+            // fails (the apex cannot reach it); the trapped feeder then fell through to a blind last move and died whole
+            // (portals: a 13-long feeder, all 7 pearls where the apex could not get them).
             if (feed)
                 for (const auto &f : friends)
-                    if ((f.get_id() & SONAR_ID_MASK) == plan->id && chebyshev(here, f.position) <= 3) delivering = true;
+                    if ((f.get_id() & SONAR_ID_MASK) == plan->id && chebyshev(here, f.position) <= 3 &&
+                        !(F_RESCUE_GATE && F_FEED_GATE && !feed_gate_ok(f, false)))
+                        delivering = true;
             if (!delivering) {
                 DIAG("rescue " << c.get_id() << ' ' << round << ' ' << c.get_length() << ' ' << (s.alpha ? 1 : 0) << ' '
                                << (straddling() ? 1 : 0) << " child " << rescue_child());
@@ -5465,28 +5579,7 @@ class Brain {
                 // Only drop our pearls where the apex will eat them: it must look like a real apex (not a
                 // 2-long dragon still carrying an old alpha ID), be able to walk to us, have the time to, and
                 // have no enemy head closer to the drop than itself. Otherwise keep walking toward it.
-                if (F_FEED_GATE) {
-                    bool reach = gap <= 2 || !F_GATE_REACH;
-                    int best_k = INF;
-                    for (int d = 0; d < 4; ++d) {
-                        Position n = step(f.position, d);
-                        auto tn = c.get_tile(n);
-                        bool ours = tn && tn->get_dragon() && tn->get_dragon()->get_id() == c.get_id();
-                        best_k = std::min(best_k, ours ? 0 : distance[index(n)]);
-                    }
-                    if (best_k <= gap + 2) reach = true;
-                    bool contested = false;
-                    for (const auto &e : enemies)
-                        if (dist(e.position, here) <= gap) contested = true;
-                    bool real = friendly_visible_length(f.get_id()) >= 3 || body_leaves_view(f.get_id());
-                    bool in_time = 500 - round >= gap + 2;
-                    if (!(reach && real && in_time && !contested)) {
-                        DIAG("feedgate " << c.get_id() << ' ' << round << ' ' << reach << real << in_time << contested << ' '
-                                         << gap << ' ' << best_k << ' ' << friendly_visible_length(f.get_id()) << ' '
-                                         << c_gap << ' ' << plan->len);
-                        break;
-                    }
-                }
+                if (F_FEED_GATE && !feed_gate_ok(f, true)) break;
                 // The apex already has a pile of pearls around it: hold off (circling nearby, off its pearls
                 // and out of its way) until it has eaten them, unless time is running out. Every feeder still
                 // travels as soon as feeding starts (consolidating early is what wins stronghold); length only
@@ -5500,7 +5593,11 @@ class Brain {
                     if (piled >= pile_limit) {
                         // The apex is full for now: a value trade beats circling.
                         if (F_SURPLUS)
-                            if (auto k = guaranteed_kill(false, true)) return *k;
+                            if (auto k = guaranteed_kill(false, true)) {
+                                DIAG("surplus " << c.get_id() << ' ' << round << " held " << k->moves.size());
+                                return *k;
+                            }
+                        DIAG("feedhold " << c.get_id() << ' ' << round << " piled " << piled << " limit " << pile_limit);
                         int hold = -1;
                         double hold_score = -1e9;
                         for (int d = 0; d < 4; ++d) {
@@ -5633,7 +5730,10 @@ class Brain {
                 }
         } else if (F_SURPLUS && !s.alpha && feed && c.get_unit_count() >= 3) {
             // Feeders on their way still take zero-loss traps and trades against clearly longer enemies.
-            if (auto safe_kill = guaranteed_kill(false, true)) return *safe_kill;
+            if (auto safe_kill = guaranteed_kill(false, true)) {
+                DIAG("surplus " << c.get_id() << ' ' << round << " way " << safe_kill->moves.size());
+                return *safe_kill;
+            }
         }
 
         bool allow_enemy_head = kam;
@@ -5675,6 +5775,7 @@ class Brain {
              perpendicular = false;
         // No legal move, but a portal we would rather not use still saves us: take it (below), don't split.
         bool no_way = legal.empty() && !(F_REVERSE_SPLIT && survival_moves() > 0);
+        s.dbg_legal = static_cast<int>(legal.size());
         bool has_safe_escape = false;
         for (int d : legal) {
             if (danger(step(here, d)) < 240) has_safe_escape = true;
@@ -6366,8 +6467,25 @@ class Brain {
     void execute(const Action &a) {
         Position post = here;
         s.lane_dir = -1;
+        int dbg_legal_turn = s.dbg_legal;
+        s.dbg_legal = -1;
+        (void)dbg_legal_turn;
         s.last_mode = a.mode;
         if (a.child) {
+            // Audit fix (F_FAMILY_PORTAL), the parent's side: a split with our body across a portal and our head outside the
+            // small chamber puts the child in that chamber. It is the child's now (F_CAMP2 adoption): no loop back in, and
+            // keep out of that portal for a while (the looping parent walked back in onto its child).
+            if (F_FAMILY_PORTAL && straddling() && !enclosure_at(here).small) {
+                auto last = std::max_element(s.used_portals.begin(), s.used_portals.end(),
+                                             [](const auto &x, const auto &y) { return x.second < y.second; });
+                if (last->first >= 0 && round - last->second <= c.get_length()) {
+                    s.family_portal = last->first;
+                    s.family_until = round + FAMILY_TTL;
+                    if (s.loop_portal == last->first) s.loop_portal = -1;
+                    if (s.chamber_portal == last->first) s.chamber_portal = -1;
+                    DIAG("familyparent " << c.get_id() << ' ' << round << " pid " << last->first);
+                }
+            }
             c.do_split(a.child);
             // v5.5: an alpha whose rear child is the larger piece (every L-2 split: cascade, rescue, kamikaze split, portal
             // sacrifice) hands it the role. The 2-long head we keep is expendable: a skirmisher.
@@ -6410,7 +6528,20 @@ class Brain {
                 int dd = di(a.moves[i]);
                 int e = s.cells[index(post)].edge[dd];
                 auto n = destination(post, dd);
-                if (e > 0) { s.pending_portal = e - 1; occupy(e - 1); s.moved_cross = static_cast<int>(i); }
+                if (e > 0) {
+                    s.pending_knew = portal(e - 1).barren;
+                    DIAG("xcross " << c.get_id() << ' ' << round << " pid " << e - 1 << " knew " << s.pending_knew << " legal "
+                                   << dbg_legal_turn << " mode " << name(a.mode) << " known " << (n ? 1 : 0));
+                    if (s.pending_knew)
+                        DIAG("barrencross " << c.get_id() << ' ' << round << " pid " << e - 1 << " mode " << name(a.mode)
+                                            << " evict " << s.evicting << " evac " << s.evacuating << " cap " << s.capture_portal
+                                            << " own " << own_portal(e - 1) << " res " << s.resident << " dead "
+                                            << portal_into_dead_cell(post, dd) << " known " << (n ? 1 : 0) << " legal "
+                                            << dbg_legal_turn);
+                    s.pending_portal = e - 1;
+                    occupy(e - 1);
+                    s.moved_cross = static_cast<int>(i);
+                }
                 if (!n) break;
                 auto t = c.get_tile(*n);
                 if (t && t->has_pearl()) s.last_food = round;
@@ -6497,7 +6628,10 @@ class Brain {
                 critical = false;
                 // Now and then, pass on a barren enclosure we know of, so newborns never walk into it.
                 // (v5.4: the whole barred set every 2 rounds; v5.3 only ever repeated the first one it knew.)
-                if (F_PORTAL_TRAP && (round + c.get_id()) % 2 == 0 && barred_mask()) extra[n_extra++] = barred_packet();
+                // Audit (F_BARRED_AIM): every round while we know a portal into a dead cell (portals: kelp stops most beams,
+                // and dragons two to four rounds old kept walking into portals the team had barred long before).
+                if (F_PORTAL_TRAP && ((F_BARRED_AIM && s.dead_known) || (round + c.get_id()) % 2 == 0) && barred_mask())
+                    extra[n_extra++] = barred_packet();
                 if (s.send_clear < 0 && !F_PORTAL_TRAP && F_PORTAL_EVICT && (round + c.get_id()) % 8 == 0)
                     for (const auto &pp : s.portals)
                         if (pp.barren && pp.id >= 0 && pp.id < 32) { s.send_clear = pp.id; break; }
@@ -6598,13 +6732,39 @@ class Brain {
             }
             // A split child is a fresh process that knows nothing. The beam we fire back into our own body
             // refracts out of our tail straight into it: hand it a barred portal on its first turn.
-            if (F_PORTAL_TRAP && a.child && s.dead_alarm < 0 && barred_mask()) {
+            // Audit fix (F_BARRED_AIM): aim it with beams_into_child() (the straight back beam misses a child born round a
+            // bend), and keep one of those beams for it when the mantle or farm hand-off below wants the others. On portals
+            // 186 of 191 walks into a portal the team had already barred were by dragons born after it was barred (median
+            // age 4 rounds): the hand-off was not reaching them.
+            int child_hits = a.child ? beams_into_child(a.child) : 0, barred_beam = 0;
+            if (a.child)
+                DIAG("splitinfo " << c.get_id() << ' ' << round << " child " << a.child << " hits " << child_hits << " barred "
+                                  << __builtin_popcount(barred_mask()) << " alarm " << s.dead_alarm << " crit " << critical);
+            if (F_BARRED_AIM && F_PORTAL_TRAP && !a.child && !critical && round <= s.handoff_until && barred_mask()) {
+                // the two turns after a split: the beam into our body still refracts out of our tail toward the child
                 int back = (di(c.get_dir()) + 2) % 4;
                 beam[back] = barred_packet();
                 used[back] = true;
             }
+            if (F_PORTAL_TRAP && a.child && s.dead_alarm < 0 && barred_mask()) {
+                if (F_BARRED_AIM && s.dead_known) s.handoff_until = round + 2;
+                int back = (di(c.get_dir()) + 2) % 4;
+                int aim = F_BARRED_AIM && child_hits ? child_hits : 1 << back;
+                bool shared = (F_MANTLE && s.mantle_send == round && s.mantle_child_len > 0) ||
+                              (F_FARM && a.mode == Mode::Rescue && farm_near(here, 8) >= 0);
+                if (F_BARRED_AIM && shared && child_hits) {
+                    // the lowest hitting beam carries the barred set when two or more hit; with one, the claim keeps it
+                    aim = (child_hits & (child_hits - 1)) ? (child_hits & -child_hits) : 0;
+                }
+                for (int d = 0; d < 4; ++d)
+                    if (aim & (1 << d)) {
+                        beam[d] = barred_packet();
+                        used[d] = true;
+                    }
+                if (F_BARRED_AIM) barred_beam = aim;
+            }
             if (F_MANTLE && a.child && s.mantle_send == round && s.mantle_child_len > 0 && s.dead_alarm < 0) {
-                int hits = beams_into_child(a.child);
+                int hits = child_hits & ~barred_beam;
                 for (int d = 0; d < 4; ++d)
                     if (hits & (1 << d)) {
                         beam[d] = mantle_packet(c.get_id(), s.mantle_child_len, round);
@@ -6616,7 +6776,7 @@ class Brain {
                 // out of our tail into it).
                 int k = farm_near(here, 8);
                 if (k >= 0) {
-                    int hits = beams_into_child(a.child);
+                    int hits = child_hits & ~barred_beam;
                     for (int d = 0; d < 4; ++d)
                         if (hits & (1 << d)) {
                             Farm f = s.farms[k];
