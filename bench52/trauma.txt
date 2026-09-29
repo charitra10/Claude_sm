@@ -1,0 +1,6 @@
+tr_all   vs v4.14@af17b153: 5/24 = 20.8% (±8.3)
+tr_noportal   vs v4.14@af17b153: 0/24 = 0.0% (±0.0)
+tr_noPORTAL_EVICT   vs v4.14@af17b153: 5/24 = 20.8% (±8.3)
+tr_noPORTAL_CLEAR   vs v4.14@af17b153: 1/24 = 4.2% (±4.1)
+tr_noPORTAL_RESERVE   vs v4.14@af17b153: 3/24 = 12.5% (±6.8)
+tr_noHAZARD   vs v4.14@af17b153: 4/24 = 16.7% (±7.6)

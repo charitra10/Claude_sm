@@ -1,0 +1,7 @@
+challenger v5.10@ec1d4e33 vs v5.9@7fcb5841, v5.8@ae46c22d; 12 maps x 8 seeds x 2 sides = 384 games, 8 workers
+
+v5.10@ec1d4e33  (838s)
+  vs v5.9@7fcb5841: 103/192 = 53.6% (±3.6)
+    autarky 10/16  default 10/16  devil 8/16  dilemma 8/16  portals 10/16  queen_of_spades 8/16  queen_of_spades_but_she_ages 8/16  schooltime 8/16  slithery_fight 8/16  stronghold 9/16  trauma 8/16  trophy 8/16
+  vs v5.8@ae46c22d: 123/192 = 64.1% (±3.5)
+    autarky 6/16  default 8/16  devil 10/16  dilemma 16/16  portals 11/16  queen_of_spades 9/16  queen_of_spades_but_she_ages 12/16  schooltime 7/16  slithery_fight 12/16  stronghold 8/16  trauma 11/16  trophy 13/16

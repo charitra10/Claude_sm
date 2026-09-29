@@ -1,0 +1,5 @@
+challenger v5.8@b68402c3 vs v5.6@7f7408db; 5 maps x 8 seeds x 2 sides = 80 games, 8 workers
+
+v5.8@b68402c3  (196s)
+  vs v5.6@7f7408db: 46/80 = 57.5% (±5.5)
+    portals 11/16  schooltime 6/16  slithery_fight 3/16  stronghold 10/16  trauma 16/16

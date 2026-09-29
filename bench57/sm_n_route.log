@@ -1,0 +1,5 @@
+challenger n_route@1b6cc1e4 vs v5.6@7f7408db; 4 maps x 8 seeds x 2 sides = 64 games, 7 workers
+
+n_route@1b6cc1e4  (13s)
+  vs v5.6@7f7408db: 31/64 = 48.4% (±6.2)
+    Colosseum 7/16  arena 7/16  default_small 8/16  small 9/16

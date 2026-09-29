@@ -1,0 +1,5 @@
+challenger M_fsalpha@80b7c07c vs v5.8@ae46c22d; 12 maps x 8 seeds x 2 sides = 192 games, 8 workers
+
+M_fsalpha@80b7c07c  (433s)
+  vs v5.8@ae46c22d: 97.5/192 = 50.8% (±3.6)
+    autarky 8.5/16  default 9/16  devil 7/16  dilemma 8/16  portals 7/16  queen_of_spades 10/16  queen_of_spades_but_she_ages 7/16  schooltime 9/16  slithery_fight 9/16  stronghold 8/16  trauma 8/16  trophy 7/16

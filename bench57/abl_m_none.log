@@ -1,0 +1,5 @@
+challenger m_none@200a7fa7 vs v5.6@7f7408db; 16 maps x 4 seeds x 2 sides = 128 games, 6 workers
+
+m_none@200a7fa7  (219s)
+  vs v5.6@7f7408db: 79/128 = 61.7% (±4.3)
+    Colosseum 5/8  arena 7/8  autarky 5/8  default 6/8  default_small 6/8  devil 3/8  dilemma 8/8  portals 4/8  queen_of_spades 5/8  queen_of_spades_but_she_ages 7/8  schooltime 3/8  slithery_fight 1/8  small 3/8  stronghold 5/8  trauma 7/8  trophy 4/8

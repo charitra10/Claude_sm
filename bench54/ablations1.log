@@ -1,0 +1,10 @@
+RESULT nocascade: var_nocascade@41c144ff vs v5.3: 60/128 = 46.9% (±4.4) errors 0
+RESULT norescue: var_norescue@ff33f412 vs v5.3: 56/128 = 43.8% (±4.4) errors 0
+RESULT nocamp: var_nocamp@8e15fc84 vs v5.3: 61/128 = 47.7% (±4.4) errors 0
+RESULT noloop: var_noloop@46230123 vs v5.3: 58/128 = 45.3% (±4.4) errors 0
+RESULT nochain: var_nochain@5b7aabe9 vs v5.3: 61/128 = 47.7% (±4.4) errors 0
+RESULT notrap: var_notrap@4921a29d vs v5.3: 61/128 = 47.7% (±4.4) errors 0
+RESULT noskirm: var_noskirm@856d4cc0 vs v5.3: 62/128 = 48.4% (±4.4) errors 0
+RESULT nogate: var_nogate@fdffe993 vs v5.3: 58/128 = 45.3% (±4.4) errors 0
+RESULT nosurplus: var_nosurplus@39d35cec vs v5.3: 60/128 = 46.9% (±4.4) errors 0
+ALLDONE

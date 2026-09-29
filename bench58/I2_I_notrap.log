@@ -1,0 +1,9 @@
+challenger I_notrap@00cbccaa vs v5.6@7f7408db, v5.5@9bf63bce, v5.4@03002ddf; 4 maps x 8 seeds x 2 sides = 192 games, 4 workers
+
+I_notrap@00cbccaa  (216s)
+  vs v5.6@7f7408db: 32/64 = 50.0% (±6.2)
+    Colosseum 7/16  arena 9/16  default_small 8/16  trophy 8/16
+  vs v5.5@9bf63bce: 31/64 = 48.4% (±6.2)
+    Colosseum 5/16  arena 9/16  default_small 8/16  trophy 9/16
+  vs v5.4@03002ddf: 34/64 = 53.1% (±6.2)
+    Colosseum 7/16  arena 9/16  default_small 8/16  trophy 10/16

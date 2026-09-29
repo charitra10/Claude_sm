@@ -1,0 +1,9 @@
+challenger D1cur@ae46c22d vs v5.6@7f7408db, v5.5@9bf63bce, v5.4@03002ddf; 3 maps x 8 seeds x 2 sides = 144 games, 4 workers
+
+D1cur@ae46c22d  (96s)
+  vs v5.6@7f7408db: 24/48 = 50.0% (±7.2)
+    Colosseum 8/16  arena 8/16  default_small 8/16
+  vs v5.5@9bf63bce: 23/48 = 47.9% (±7.2)
+    Colosseum 6/16  arena 8/16  default_small 9/16
+  vs v5.4@03002ddf: 26/48 = 54.2% (±7.2)
+    Colosseum 8/16  arena 8/16  default_small 10/16

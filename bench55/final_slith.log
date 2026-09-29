@@ -1,0 +1,7 @@
+challenger v5.5@9bf63bce vs v5.3@69022805, v5.1@7a7395c2; 1 maps x 12 seeds x 2 sides = 48 games, 12 workers
+
+v5.5@9bf63bce  (206s)
+  vs v5.3@69022805: 14/24 = 58.3% (±10.1)
+    slithery_fight 14/24
+  vs v5.1@7a7395c2: 10/24 = 41.7% (±10.1)
+    slithery_fight 10/24

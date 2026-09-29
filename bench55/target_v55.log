@@ -1,0 +1,7 @@
+challenger v5.5@3b6417f9 vs v5.3@69022805, v5.1@7a7395c2; 6 maps x 12 seeds x 2 sides = 288 games, 6 workers
+
+v5.5@3b6417f9  (517s)
+  vs v5.3@69022805: 91/144 = 63.2% (±4.0)
+    autarky 16/24  dilemma 20/24  queen_of_spades 19/24  queen_of_spades_but_she_ages 14/24  slithery_fight 5/24  trauma 17/24
+  vs v5.1@7a7395c2: 110/144 = 76.4% (±3.5)
+    autarky 24/24  dilemma 24/24  queen_of_spades 17/24  queen_of_spades_but_she_ages 18/24  slithery_fight 11/24  trauma 16/24

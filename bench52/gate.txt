@@ -1,0 +1,10 @@
+challenger gated@b750a37a vs v5.1@7a7395c2; 3 maps x 12 seeds x 2 sides = 72 games, 6 workers
+
+gated@b750a37a  (654s)
+  vs v5.1@7a7395c2: 40/72 = 55.6% (±5.9)
+    big_empty 12/24  help 13/24  schooltime 15/24
+challenger be_all@30adb767 vs v5.1@7a7395c2; 2 maps x 12 seeds x 2 sides = 48 games, 6 workers
+
+be_all@30adb767  (392s)
+  vs v5.1@7a7395c2: 30/48 = 62.5% (±7.0)
+    help 16/24  schooltime 14/24
