@@ -104,6 +104,12 @@ constexpr bool HARVEST_UNSEEN = false; // (F_HARVEST_FIX) out-of-view tiles that
 // moves, the pair rule only drops the goal of the dragon farther from it, and a scout forages SCOUT_REST rounds on arrival.
 constexpr bool F_SCOUT_FIX = true;
 constexpr int SCOUT_ARRIVE = 4, SCOUT_REST = 10;
+// F_RDV_FIX (F_RENDEZVOUS): 8847 trips in 48 games, 19% on time, 83% ate nothing at the cluster (0.34 pearls a trip); with the
+// module off the team ate as many pearls. Trips were timed by straight-line distance (walls ignored) and allowed to arrive up
+// to 15 rounds late (closed trips arrived 5.4 rounds after the spawn on average, when the pile was gone). Now the walk is the
+// route over the remembered map, and a trip starts (and goes on) only if it arrives within RDV_LATE rounds of the spawn.
+constexpr bool F_RDV_FIX = true;
+constexpr int RDV_LATE = 2;
 
 // v5.6 modules, switchable the same way.
 constexpr bool F_DRY_EVICT = true;    // leave a portal chamber at once when no pearl lies in it and none is due soon
@@ -1066,7 +1072,9 @@ class Brain {
         if (s.rdv_goal >= 0) {
             auto &r = s.rdv[s.rdv_goal];
             int k = dist(here, r.p);
-            if (r.value == 0 || round > r.t + 15 || (k <= 1 && round >= r.t)) {
+            int walk = F_RDV_FIX ? (memory_bfs(), mem_depth[index(r.p)]) : 0;
+            bool late = F_RDV_FIX && k > 1 && (walk >= INF || round + walk > r.t + RDV_LATE);
+            if (r.value == 0 || round > r.t + 15 || (k <= 1 && round >= r.t) || late) {
                 DIAG("rdvdone " << c.get_id() << ' ' << round << ' ' << r.p.x << ',' << r.p.y << " t " << r.t << " k " << k);
                 r.value = 0;
                 s.rdv_goal = -1;
@@ -1080,9 +1088,15 @@ class Brain {
             const auto &r = s.rdv[i];
             if (r.value < RDV_MIN) continue;
             int k = dist(here, r.p), wait = r.t - round;
-            if (k < 2 || k > 20 || wait - k > 3 || k - wait > 15) continue;
+            if (F_RDV_FIX) {
+                memory_bfs();
+                k = mem_depth[index(r.p)];
+                if (k >= INF) continue;
+            }
+            if (k < 2 || k > 20 || wait - k > 3 || k - wait > (F_RDV_FIX ? RDV_LATE : 15)) continue;
             bool nearer = false;
-            for (const auto &f : friends) nearer = nearer || dist(f.position, r.p) < k;
+            for (const auto &f : friends)
+                nearer = nearer || (F_RDV_FIX && F_TRUE_MOVES ? moves_of(f, r.p) : dist(f.position, r.p)) < k;
             if (nearer) continue;
             double sc = r.value / (k + 2.0);
             if (sc > best) { best = sc; pick = i; }

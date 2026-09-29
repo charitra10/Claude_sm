@@ -85,6 +85,32 @@ spot; the pair rule drops a scout goal only for the dragon farther from it. Resu
 per arrival 0.50 against 0.52 at the scouts' own rate. The trips are cleaner, but still do not reach anything richer than
 where the scout was.
 
+## v5.7 modules
+
+Covered elsewhere: `F_CHOKE2` (the dead-end entry rule, see `F_CHOKE`), `F_TAIL_BFS` (see `F_BACK_HARVEST`: 77-80% of its
+children eat 2+), `F_SCOUT_NEAR` / `F_SCOUT_NEARER` / `F_HOTSPOT2` (the scouting system, see `F_MIRROR_SCOUT`). `F_TAIL_DROP`
+only changed the path-based harvest, which `F_HARVEST_FIX` replaces: dead code with the fix on. Off in v5.9 and not audited:
+`F_KAM_CAP`, `F_BARREN`, `F_HYBRID`, `F_SECTOR_HASH`.
+
+| module | intended behaviour | measured (on / off) | verdict |
+|---|---|---|---|
+| `F_SPLIT_CAP` | no voluntary non-alpha split while the team has more than 33 units | voluntary 2-splits by non-alphas over the cap (harvests and farm splits excluded, as designed): 0 | **works** (the gate holds) |
+| `F_SPLIT_COOL` | the rear child of an escape split makes no voluntary split for 8 rounds | such splits within 8 rounds of birth: 0 | **works** |
+| `F_FEED_CLEAR` | endgame feeders never box the apex in | our longest dragon (10+) dying after round 350 into our own bodies or with no move: 0 | **works** |
+| `F_RENDEZVOUS` | be at a cluster of tiles due to spawn together when it spawns, and eat it | 8847 trips in 48 games; 19% on time; 83% ate nothing at the cluster, 0.34 pearls a trip. Pearls eaten by the team 33753 / 33689 | **does not work** -> fixed (`F_RDV_FIX`) |
+
+### F_RENDEZVOUS: late by design, and the fix
+
+A trip started when the straight-line distance roughly matched the wait, and was allowed to arrive up to 15 rounds after
+the spawn ("pearls stay until eaten"). Walls were ignored, so on maze maps the walk was much longer than the distance; the
+trips that closed at the spot arrived 5.4 rounds after the spawn on average, when others had eaten the pile. 4349 of the
+trips were dropped before closing (food in view comes first, which is right) and started again later.
+
+`F_RDV_FIX`: the walk is the route over the remembered map (`memory_bfs()`, unseen tiles open), a trip starts only if it
+arrives no more than `RDV_LATE` = 2 rounds after the spawn, is dropped as soon as it no longer can, and a teammate in view
+nearer by moves takes it. Result (48 games, the other fixes off): 2223 trips, 40% on time, 0.51 pearls a trip (1.10 per
+on-time trip), team pearls 34983.
+
 ## Win rate
 
 (pending: `bench59e/wr1_*.jsonl`)
@@ -92,6 +118,6 @@ where the scout was.
 ## Code changes in v5.9/main.cpp
 
 - Flags (block "v5.9e" after the v5.5 constants): `F_HARVEST_FIX`, `HARVEST_REACH`, `HARVEST_UNSEEN`, `F_SCOUT_FIX`,
-  `SCOUT_ARRIVE`, `SCOUT_REST`.
+  `SCOUT_ARRIVE`, `SCOUT_REST`, `F_RDV_FIX`, `RDV_LATE`.
 - `reach_harvest()`, `harvest_taken()` (F_HARVEST_FIX); arrival, rest and pair-rule changes in `scout_goal()` and the
-  `F_PAIR_SEP` block (F_SCOUT_FIX); `DragonState::scout_rest_until`.
+  `F_PAIR_SEP` block (F_SCOUT_FIX); `DragonState::scout_rest_until`; `rendezvous_target()` (F_RDV_FIX).
