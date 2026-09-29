@@ -264,6 +264,24 @@ constexpr int FLANK_AHEAD = 4;
 constexpr double FLANK_LINE_PENALTY = 35.0;
 constexpr bool EXIT_CLEAR_ON = F_EXIT_CLEAR && !(F_PORTAL_PROBE && F_PROBE_EXIT_FREE);
 
+// v5.9d: fixes from the behavioural audit of the v5.2 modules (audit52/, strategyV_5_9d.md), switchable the same way.
+// F_HAZARD announced a "trap" whenever bodies ahead closed the flood, so most hazards (81% over 12 maps) marked 1-wide
+// corridors open at both ends, and 16% of owners walked back out past their own mouth. Now the region behind the mouth must
+// be closed by walls (no other way out; a loop inside is fine: a room crowded with bodies is still a trap while it is full).
+constexpr bool F_HAZARD_CLOSED = true;
+// F_ALPHA_MEMORY: of 9707 trips to a remembered pearl the alpha ate it on 209 (2%); a teammate ate it first on 3305 (34%)
+// and 39% were dropped after about 2 rounds (re-chosen every turn). Alpha pearls per game were the same with it off. Now
+// the alpha skips pearls a teammate is nearer to (as the generic memory does), needs a remembered way there, and keeps
+// the pearl it set off for (F_REM_COMMIT's rule).
+constexpr bool F_AMEM_FIX = true;
+// F_PORTAL_RESERVE: 94% of our entries into a chamber a teammate already held were by dragons that never heard its
+// reservation: the camper renewed it on one rotating beam, and sonar stops at kelp, so it hit the chamber walls. Now a
+// camper sends it on the beam that leaves through its portal (sonar crosses portals) whenever one does. And default's nine
+// chambers each have two portals, but only the first one found was ever reserved: newcomers came in by the other one.
+constexpr bool F_RESERVE_AIM = false; // measured: settled-chamber entries 125 -> 120 over 48 games (off: 164): not shipped
+constexpr bool F_RESERVE_ALL = false; // reserve every portal of the chamber we hold, in rotation (default: 90 vs 43 settled-chamber
+                                     // entries in 4 games, worse: off)
+
 // Sonar tags carried in the 13-bit alpha-ID field. 8191 already meant "no alpha"; real IDs never get
 // near these values, and every other field of the packet keeps its usual meaning.
 constexpr int HAZARD_TAG = 8190, PORTAL_TAG = 8189, HANDOVER_TAG = 8188;
@@ -348,6 +366,7 @@ struct Hazard {
 struct PearlMemory {
     Position p;
     int seen = -1000;
+    bool claimed = false; // v5.9d (F_AMEM_FIX): when last seen, a teammate was nearer to it than we were
 };
 
 // v5.6: a mirrored hotspot some teammate reported (or we found).
@@ -454,6 +473,10 @@ struct DragonState {
     int born_len = 0;                                   // our length on our first turn
     Position rem_goal;                                  // remembered pearl we are walking to (F_REM_COMMIT)
     int rem_until = -1000;
+    Position amem_goal;                                 // v5.9d (F_AMEM_FIX): the alpha's remembered pearl we set off for
+    int amem_until = -1000;
+    int resv_aim_round = -1000;                         // v5.9d (F_RESERVE_AIM): last aimed reservation
+    int resv_rr = 0;                                    // v5.9d (F_RESERVE_ALL): next portal of our chamber to renew
     int pair_turns = 0;                                 // turns a teammate head has been beside ours (F_PAIR_SEP)
     int deadend_until = -1000;                          // no dead-end entry until then (F_CHOKE_LOOP)
     std::array<Position, 64> hist{};                    // our body, tail first (F_CHOKE_LOOP); hist_n < length: unknown
@@ -943,6 +966,23 @@ class Brain {
 
     // Portal packet: the sender's ID sits in the position field (it breaks ties between two dragons
     // reserving the same portal); alen = portal id (5 bits) | small | barren | clear.
+    // v5.9d (F_RESERVE_AIM): a direction whose beam from `from` runs straight over open, empty tiles we know and out through
+    // portal `pid` (sonar crosses portals), or -1.
+    int portal_beam_dir(Position from, int pid) const {
+        for (int d = 0; d < 4; ++d) {
+            Position p = from;
+            for (int k = 0; k < 24; ++k) {
+                int e = s.cells[index(p)].edge[d];
+                if (e == pid + 1) return d;
+                if (e != 0) break;
+                p = step(p, d);
+                auto t = c.get_tile(p);
+                if (!t || t->get_dragon()) break;
+            }
+        }
+        return -1;
+    }
+
     std::uint64_t portal_packet(int pid, bool clear) const {
         const auto &port = portal_const(pid);
         int me = c.get_id() & 4095;
@@ -1401,17 +1441,19 @@ class Brain {
         return none;
     }
 
-    void add_hazard(Position p, int dir, int origin) {
+    bool add_hazard(Position p, int dir, int origin) {
         int slot = 0;
         for (int i = 0; i < MAX_HAZARDS; ++i) {
             auto &hz = s.hazards[i];
             if (hz.p == p && hz.dir == dir) {
+                bool renewed = round - hz.origin > HAZARD_TTL;
                 hz.origin = std::max(hz.origin, origin);
-                return;
+                return renewed;
             }
             if (hz.origin < s.hazards[slot].origin) slot = i;
         }
         s.hazards[slot] = {p, dir, origin};
+        return true;
     }
 
     // v5.9b: a timed mark on a tile (a lane end, a portal exit): `dir` -1 means any way in, `origin` is the last round it holds.
@@ -1686,6 +1728,7 @@ class Brain {
         std::array<int, 4> friend_ids{{-1, -1, -1, -1}}; // v5.5: distinct teammates with a segment inside
         int friend_heads = 0;                             // v5.5: bit i: friend_ids[i] has its head inside
         int pearls_now = 0, due_soon = 0;                 // v5.6: pearls lying in it; tiles due within DRY_HORIZON
+        std::uint32_t portal_mask = 0;                    // v5.9d: every portal id (< 32) with an edge in it
     };
 
     Enclosure enclosure_at(Position start) const {
@@ -1701,6 +1744,7 @@ class Brain {
                 int e = s.cells[index(p)].edge[d];
                 if (e == -2) { sealed = false; break; }
                 if (e > 0 && out.portal_id < 0) out.portal_id = e - 1;
+                if (e > 0 && e - 1 < 32) out.portal_mask |= 1U << (e - 1);
                 if (e != 0) continue;
                 auto n = step(p, d);
                 if (remembered_first[index(n)] >= 0) continue;
@@ -1974,7 +2018,8 @@ class Brain {
         }
         if (tag == HAZARD_TAG) {
             if (!F_HAZARD || age > HAZARD_TTL || px >= w || py >= h || !(bits & 4)) return;
-            add_hazard({px, py}, bits & 3, origin);
+            if (add_hazard({px, py}, bits & 3, origin))
+                DIAG("hazrecv " << c.get_id() << ' ' << round << ' ' << px << ',' << py << " dir " << (bits & 3) << " age " << age);
             return;
         }
         int sender = px | (py << 6), pid = bits & 31;
@@ -1999,6 +2044,8 @@ class Brain {
         // Two dragons reaching for the same portal at once: the lower ID keeps it.
         if (s.contend_portal == pid && round - s.contend_round <= 3 && (c.get_id() & 4095) < sender) return;
         if (origin + RESERVE_TTL > port.reserved_until) {
+            if (round > port.reserved_until || port.reserved_by != sender)
+                DIAG("resvrecv " << c.get_id() << ' ' << round << ' ' << pid << " by " << sender << " age " << age);
             port.reserved_until = origin + RESERVE_TTL;
             port.reserved_by = sender;
         }
@@ -2358,7 +2405,10 @@ class Brain {
                     for (int j = n - 16; j < i && !dup; ++j) dup = s.recent_path[j] == s.recent_path[i];
                     if (!dup) ++distinct;
                 }
-                if (distinct <= 7) break_loop(16);
+                if (distinct <= 7) {
+                    DIAG("cycle2 " << c.get_id() << ' ' << round << " distinct " << distinct << " idle " << round - s.last_food);
+                    break_loop(16);
+                }
             }
         }
         // Oscillation: the last 2p positions repeat with period p and we ate nothing along the loop.
@@ -2369,6 +2419,7 @@ class Brain {
                 for (int k = n - per; k < n && periodic; ++k)
                     if (s.recent_path[k] != s.recent_path[k - per]) periodic = false;
                 if (!periodic) continue;
+                DIAG("cycle1 " << c.get_id() << ' ' << round << " period " << per << " idle " << round - s.last_food);
                 if (F_CYCLE2) { break_loop(2 * per); break; }
                 std::uint32_t r = mix(static_cast<std::uint32_t>(c.get_id()) * 7919U + static_cast<std::uint32_t>(round));
                 s.cycle_break_until = round + 8;
@@ -2574,7 +2625,7 @@ class Brain {
                 if (s.pearl_mem[i].seen < s.pearl_mem[oldest].seen) oldest = i;
             }
             if (slot < 0) slot = oldest;
-            s.pearl_mem[slot] = {p, round};
+            s.pearl_mem[slot] = {p, round, false};
         }
     }
 
@@ -2585,10 +2636,43 @@ class Brain {
             if (m.seen <= -1000 || m.seen == round) continue; // still in view: food_target already judged it
             int d = dist(here, m.p);
             if (d < 1 || d > 24) continue;
+            if (F_AMEM_FIX) {
+                if (m.claimed || claimed(m.p)) continue;
+                if (F_ROUTE_MEM) {
+                    memory_bfs();
+                    int md = mem_depth[index(m.p)];
+                    if (md >= INF || md > d + 3) continue;
+                    d = md;
+                }
+            }
             double score = 40.0 / (d + 1.0) - 0.15 * (round - m.seen);
             if (score > best_score) { best_score = score; best = m.p; }
         }
         return best;
+    }
+
+    // v5.9d (F_AMEM_FIX): pearls in view that a teammate is nearer to are left to it (needs this turn's BFS: after paths()).
+    void mark_amem_claims() {
+        for (auto &m : s.pearl_mem)
+            if (m.seen == round) m.claimed = claimed(m.p);
+    }
+
+    // v5.9d (F_AMEM_FIX): keep the remembered pearl we set off for until it is gone, claimed, reached or late.
+    std::optional<Position> alpha_memory_pick() {
+        if (!F_AMEM_FIX) return alpha_memory_target();
+        if (round <= s.amem_until && s.amem_goal != here) {
+            for (const auto &m : s.pearl_mem)
+                if (m.seen > -1000 && m.p == s.amem_goal && !m.claimed && !claimed(m.p) && mem_reachable(m.p))
+                    return s.amem_goal;
+        }
+        s.amem_until = -1000;
+        auto p = alpha_memory_target();
+        if (p) {
+            s.amem_goal = *p;
+            int k = F_ROUTE_MEM ? (memory_bfs(), mem_depth[index(*p)]) : dist(here, *p);
+            s.amem_until = round + k + 3;
+        }
+        return p;
     }
 
     // v5.6: a camper about to cross its chamber's portal only because nothing else is left: come straight back.
@@ -3030,6 +3114,40 @@ class Brain {
         if (F_CHOKE_LOOP && round < s.deadend_until && !(F_FARM && live >= FARM_MIN)) return false;
         if (F_CHOKE2) return live >= CHOKE_MIN_PEARLS;
         return c.get_length() == 2 && live > 0;
+    }
+
+    // v5.9d (F_HAZARD_CLOSED): entering `mouth` moving d leads into a region the walls close off: the flood (walls only,
+    // loops allowed) never gets back out except through the mouth, meets no usable portal, no unknown edge or tile, and
+    // stays within 48 tiles. A corridor open at its far end is not closed, however many bodies fill it now.
+    bool closed_behind(Position mouth, int d) const {
+        constexpr int CAP = 48;
+        static std::array<Position, CAP + 4> q;
+        int back = (d + 2) % 4, lo = 0, hi = 0;
+        Position outside = step(mouth, back);
+        bool closed = true;
+        q[hi++] = mouth;
+        space_seen[index(mouth)] = true;
+        while (lo < hi && closed) {
+            Position cur = q[lo++];
+            for (int k = 0; k < 4 && closed; ++k) {
+                if (cur == mouth && k == back) continue;
+                int e = s.cells[index(cur)].edge[k];
+                if (e == -2) { closed = false; break; }
+                if (e > 0) {
+                    if (!portal_occupied(e - 1)) closed = false;
+                    continue;
+                }
+                if (e != 0) continue;
+                Position nx = step(cur, k);
+                if (nx == outside || s.cells[index(nx)].seen < 0) { closed = false; break; }
+                if (space_seen[index(nx)]) continue;
+                if (hi >= CAP) { closed = false; break; }
+                space_seen[index(nx)] = true;
+                q[hi++] = nx;
+            }
+        }
+        for (int i = 0; i < hi; ++i) space_seen[index(q[i])] = false;
+        return closed;
     }
 
     bool sealed_pocket(Position p, int arr_d, int &pearls, int &size, int *active = nullptr, bool static_only = false) const {
@@ -5046,6 +5164,7 @@ class Brain {
     Action decide_core() {
         observe();
         paths();
+        if (F_ALPHA_MEMORY && F_AMEM_FIX && s.alpha) mark_amem_claims();
 
         int opp_dir = (di(c.get_dir()) + 2) % 4;
         int feed_start = feed_round();
@@ -5134,7 +5253,12 @@ class Brain {
         if (F_HAZARD && s.enc_dir >= 0 && round - s.enc_round <= 40 && round - s.hazard_sent >= 3 &&
             dist(here, s.enc_mouth) <= std::max(8, c.get_length() + 2)) {
             int pocket_pearls = 0, pocket_size = 0;
-            if (sealed_pocket(here, di(c.get_dir()), pocket_pearls, pocket_size)) {
+            if (sealed_pocket(here, di(c.get_dir()), pocket_pearls, pocket_size) &&
+                (!F_HAZARD_CLOSED || closed_behind(s.enc_mouth, s.enc_dir))) {
+                DIAG("hazard " << c.get_id() << ' ' << round << ' ' << s.enc_mouth.x << ',' << s.enc_mouth.y << " dir " << s.enc_dir
+                               << " at " << here.x << ',' << here.y << " len " << c.get_length() << " size " << pocket_size
+                               << " pearls " << pocket_pearls << " fwd " << forward_escape_count(here, di(c.get_dir()))
+                               << " entered " << s.enc_round);
                 add_hazard(s.enc_mouth, s.enc_dir, round);
                 s.hazard_sent = round;
             }
@@ -5249,8 +5373,15 @@ class Brain {
                     if (evict_plan && distance[index(evict_plan->approach)] >= INF) evict_plan.reset();
                     if (!evict_plan && crowded && c.get_length() <= enc.longest_friend)
                         return {{DIRS[opp_dir]}, 0, Mode::Feed, true};
-                } else if (round - s.contend_round >= 10) {
+                } else if (round - s.contend_round >= (F_RESERVE_ALL && __builtin_popcount(enc.portal_mask) > 1 ? 5 : 10)) {
                     s.send_reserve = enc.portal_id; // still here: renew the reservation
+                    if (F_RESERVE_ALL && enc.portal_mask) { // every portal of the chamber in turn
+                        int k = s.resv_rr % 32;
+                        for (int j = 0; j < 32; ++j, k = (k + 1) % 32)
+                            if (enc.portal_mask >> k & 1) break;
+                        s.send_reserve = k;
+                        s.resv_rr = k + 1;
+                    }
                     s.contend_portal = enc.portal_id;
                     s.contend_round = round;
                 }
@@ -5493,7 +5624,9 @@ class Brain {
                 // sets how big a pile makes it wait. Long feeders drop almost at once, short ones and ex-
                 // kamikazes wait for the apex to clear its pile first.
                 int pile_limit = !F_FEED_ADAPT ? 5 : c.get_length() >= 6 ? 9 : c.get_length() >= 4 ? 5 : 3;
-                if ((F_FEED_BACKOFF || F_FEED_ADAPT) && 500 - round > c.get_length() + (F_FEED_CLEAR ? LATE_FEED : 10)) {
+                // v5.9d: F_FEED_BACKOFF alone switches holding (it read F_FEED_BACKOFF || F_FEED_ADAPT, so the v5.2 ablation of
+                // F_FEED_BACKOFF left holding on and measured exactly 0.0); F_FEED_ADAPT only sets the pile limit by length.
+                if (F_FEED_BACKOFF && 500 - round > c.get_length() + (F_FEED_CLEAR ? LATE_FEED : 10)) {
                     int piled = 0;
                     for (const auto &t : c.get_tiles())
                         if (t.has_pearl() && chebyshev(t.get_position(), f.position) <= 3) ++piled;
@@ -5514,6 +5647,8 @@ class Brain {
                             double sc = -std::abs(k - 4) + 0.5 * escape_count(n);
                             if (sc > hold_score) { hold_score = sc; hold = d; }
                         }
+                        DIAG("feedhold " << c.get_id() << ' ' << round << " piled " << piled << " limit " << pile_limit << " len "
+                                         << c.get_length() << " gap " << gap << " apex " << plan->id << " hold " << hold);
                         if (hold >= 0) return {{DIRS[hold]}, 0, Mode::Feed, false};
                     }
                 }
@@ -5527,6 +5662,15 @@ class Brain {
                             return {{DIRS[d]}, 0, Mode::Feed, false};
                     }
                 }
+#ifdef BOT_DIAG
+                {
+                    int piled = 0;
+                    for (const auto &t : c.get_tiles())
+                        if (t.has_pearl() && chebyshev(t.get_position(), f.position) <= 3) ++piled;
+                    DIAG("feeddrop " << c.get_id() << ' ' << round << " apex " << f.get_id() << " len " << c.get_length()
+                                     << " gap " << gap << " piled " << piled << " limit " << pile_limit);
+                }
+#endif
                 return {{DIRS[opp_dir]}, 0, Mode::Feed, true};
             }
         }
@@ -5711,7 +5855,10 @@ class Brain {
         if (!pearls && !future && !feed) {
             // v5.7: a pile of pearls due on a timetable we saw beats a single remembered pearl.
             if (F_RENDEZVOUS && !threatened && !s.camping && !s.evacuating) rem_pearl = rendezvous_target();
-            if (!rem_pearl && F_ALPHA_MEMORY && s.alpha && !small_map_splitting_alpha) rem_pearl = alpha_memory_target();
+            if (!rem_pearl && F_ALPHA_MEMORY && s.alpha && !small_map_splitting_alpha) {
+                rem_pearl = alpha_memory_pick();
+                if (rem_pearl) DIAG("amem " << c.get_id() << ' ' << round << ' ' << rem_pearl->x << ',' << rem_pearl->y);
+            }
             if (!rem_pearl) rem_pearl = committed_pearl_target();
             if (F_PATCH_CAMP && s.patch_camp && rem_pearl && !in_patch_tiles(*rem_pearl)) rem_pearl.reset();
         } else if (F_RENDEZVOUS && s.rdv_goal >= 0 && pearls) {
@@ -5987,7 +6134,9 @@ class Brain {
         // Direct BFS path for pearl/portal/visible-feed targets (avoiding pearls reserved for Alpha & friendly sole-exit traps)
         bool alpha_safe_fastpath = s.alpha && (pearls || future) && target_direction >= 0 &&
                                    danger(step(here, target_direction)) < 280;
-        bool breaking_cycle = F_CYCLE && round < s.cycle_break_until;
+        // v5.9d: F_CYCLE2's breakout (set by either detector) steers here too; with F_CYCLE off this used to switch off the
+        // breakout steering of F_CYCLE2 as well, so the F_CYCLE ablation measured both modules.
+        bool breaking_cycle = (F_CYCLE || F_CYCLE2) && round < s.cycle_break_until;
         if ((!s.alpha || feed || small_map_splitting_alpha || alpha_safe_fastpath) && target &&
             (pearls || future || rem_pearl || use_portal || direct_feed) &&
             !(breaking_cycle && !pearls && !use_portal && !direct_feed) &&
@@ -6595,6 +6744,23 @@ class Brain {
                 int d = (round + i) % 4;
                 beam[d] = extra[i];
                 used[d] = true;
+            }
+            // v5.9d (F_RESERVE_AIM): a camper's reservation goes out through its own portal, where newcomers approach.
+            if (F_PORTAL_RESERVE && F_RESERVE_AIM && !critical && (s.camping || s.resident) && !s.evicting &&
+                round - s.resv_aim_round >= 3) {
+                auto enc = enclosure_at(post);
+                std::uint32_t mask = F_RESERVE_ALL ? enc.portal_mask
+                                   : enc.portal_id >= 0 && enc.portal_id < 32 ? 1U << enc.portal_id : 0U;
+                for (int pid = 0; enc.small && pid < 32; ++pid) {
+                    if (!(mask >> pid & 1) || portal_const(pid).barren) continue;
+                    int d = portal_beam_dir(post, pid);
+                    if (d < 0) continue;
+                    beam[d] = portal_packet(pid, false);
+                    used[d] = true;
+                    s.resv_aim_round = round;
+                    DIAG("resvaim " << c.get_id() << ' ' << round << ' ' << pid << " dir " << d);
+                    break;
+                }
             }
             // A split child is a fresh process that knows nothing. The beam we fire back into our own body
             // refracts out of our tail straight into it: hand it a barred portal on its first turn.
