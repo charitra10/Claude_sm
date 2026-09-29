@@ -125,7 +125,36 @@ tile (61 of 558) falls through to the drop.
 
 ## Win rate
 
-(filled in below from `bench59d/val_901.jsonl`)
+Plain builds, `seedbench.py`, fresh seeds 901-906, the 16 maps without `help` and `big_empty` (the ladder maps plus the
+four small ones), both sides: 192 games per pairing. Raw: `bench59d/val_901.jsonl` (v5.9d), `bench59d/val_901_orig.jsonl`
+(original v5.9, same games).
+
+| pairing | score |
+|---|---|
+| v5.9d vs original v5.9 | **54.7%** (105/192, ±3.6) |
+| v5.9d vs v5.8 | **65.1%** (125/192, ±3.4) |
+| original v5.9 vs v5.8 (same seeds) | 59.6% (114.5/192, ±3.5) |
+
+Paired over the same 192 games against v5.8, v5.9d won 29 that the original lost and lost 18 that it won (sign test
+z = 1.6, p about 0.11). Head to head it is +4.7 points (z about 1.3). Both point the same way, neither is significant: treat
+the fixes as behaviour fixes that do not cost games, with a likely small gain. Per map against v5.8 (v5.9d / original, of
+12): queen_of_spades 10 / 5, queen_of_spades_but_she_ages 9 / 6, default 10 / 8, stronghold 6 / 5 (the maps with rooms
+and chambers); slithery_fight 5 / 7, the rest within one game.
+
+The 48-game behaviour runs (DIAG builds vs v5.8, seeds 1-2) gave: baseline 25, closed hazards 29, alpha memory fix 31
+wins. Module-off runs there: hazard 30, portal evict 25, portal clear 27, reserve 26, disperse 25, cycle 28 (decoupled),
+feed adapt 31, feed backoff 29 (the real ablation), alpha memory 28. One standard error is about 3.5 wins, so none of the
+v5.2 modules is shown to win games on these maps: `F_PORTAL_EVICT` is the only one whose behaviour clearly matters.
+
+CPU (judge sandbox, schooltime seed 1, v5.9d vs v5.8): p50 5.2M, p99 6.7M, max 7.6M points per turn (v5.8 in the same
+game: 5.0M / 6.5M / 6.8M; budget 100M).
+
+## Suggested next steps
+- `F_CYCLE` can go (or stay): it changes nothing measurable. `F_FEED_BACKOFF` / `F_FEED_ADAPT` likewise; delivery losses
+  come from the endgame (no holding in the last `LATE_FEED` rounds) and from failed holds, not from pile size.
+- The portal reservation needs a way to reach entrants that works through walls; aiming through the portal was not enough.
+  The collisions at portal exits on the portals map come from teammates crossing the same portal pair from both sides.
+- Validate v5.9d on more seeds (and on help / big_empty) before submitting it over v5.9.
 
 ## Code changes in v5.9/main.cpp
 

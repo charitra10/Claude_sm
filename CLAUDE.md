@@ -28,6 +28,10 @@ C++ bots for **UNSW Battlecode** (a snake-like "dragons" game on a toroidal grid
   ladder battle in `battle-M604164-replays/` plus `Aut_1.replay` / `Trpy_1.replay` (we are team B in those two), the 8179
   guard sonar tag, forward-selection ablations, fresh-seed results, and the analysis of why all ten battle games were lost.
   Raw results in `bench510/`. Turn numbers quoted from the replay viewer do not match `replay_tools/`: locate by ID and round.
+- `strategyV_5_9d.md`: behavioural audit of the nine v5.2 modules in v5.9 (does each do what it was built for, measured on
+  replays, independently of win rate), the fixes made in `v5.9/main.cpp` ("v5.9d" flag block: `F_HAZARD_CLOSED`,
+  `F_AMEM_FIX`; the `F_CYCLE` / `F_FEED_BACKOFF` ablations were broken and are fixed), and fresh-seed results. Tools in
+  `audit52/` (see its README), raw results in `bench59d/`.
 - `replay_tools/`: decoder and analysis scripts for `.replay` files (packed Cap'n Proto): full board per turn, deaths by
   cause, chamber occupancy. See its README.
 - `maps/maps/`: the current map set (the toolkit's bundled maps plus `help`, `small`, `queen_of_spades_but_she_ages`, `portals` and `slithery_fight`). Four top-level files in `maps/` (`arena`, `big_empty`, `default`, `stronghold`) are older versions. `maps_variants/` holds flipped/transposed copies generated from the old set.
