@@ -124,8 +124,8 @@ was out of view (11 tiles back).
 **Fix (`F_STRADDLE_SEEN`):** walk the visible body from the head (`body_tiles()`). If the chain stops short of our length
 at a segment within 2 tiles of the head, all its neighbours are in view, so the next segment must be behind a portal edge.
 
-**Result:** non-rescue straddle splits 19 → 4; long-portal splits on slithery_fight 25 → 4; rescue straddle splits 133 →
-97.
+**Result (final build, same 78 games):** non-rescue straddle splits 19 → 3; long-portal splits on slithery_fight 25 → 6
+(282 → 181 over all maps); rescue straddle splits 133 → 95.
 
 ### F_HANDOVER (the role passes to an L−2 split's rear child): redundant for its purpose, useful by accident
 Since v5.5, `F_MANTLE` names the child in the parent's split-turn beam, which refracts out of the parent's own tail into
