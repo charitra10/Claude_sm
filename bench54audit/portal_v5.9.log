@@ -1,0 +1,5 @@
+challenger v5.9@926238da vs v5.8@ae46c22d; 2 maps x 16 seeds x 2 sides = 64 games, 4 workers
+
+v5.9@926238da  (370s)
+  vs v5.8@ae46c22d: 38/64 = 59.4% (±6.1)
+    portals 19/32  slithery_fight 19/32
