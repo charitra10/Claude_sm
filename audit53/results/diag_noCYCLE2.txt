@@ -1,0 +1,2 @@
+noCYCLE2     n=78 loop=0.0/g away10=nan reloop=nan ate20=nan | cap=40 capsplit=0 capho=35 none=22 sacr=231 | hochild=4185 claimed=2735 | hz=2976 rx/hz=11.56 entries=659 knew=134 long=304 | pre=37.3/g rel=3.1/g
+   breakout targets: 

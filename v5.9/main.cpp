@@ -63,6 +63,22 @@ constexpr int LONG_PORTAL_LEN = 8, ALPHA_PORTAL_ROUND = 50, FRIEND_PORTAL_TTL = 
 // rounds; it still shuns the portal it came through for 20 rounds (no ping-pong). 4 = the same with nothing due within 40
 // (schooltime's rooms spawn on long timers: mode 3 let dragons walk out of them, seed 702 lost with it, won with mode 2).
 constexpr int PORTAL_RESIDENCY = 4;
+// v5.9e: fixes from the behavioural audit of the v5.3 modules (audit53/, strategyV_5_9e.md), switchable the same way.
+// F_STRADDLE: 152 splits (child > 2) in 78 games had the body across a portal. A split child whose parent straddled one is
+// born straddling it; it never crossed, and the segment facing across was out of view, so it split again straight away
+// (slithery_fight: a chain of 10-long children every 2 rounds, each 2-long head dying within 4 rounds). Now a body chain
+// that ends in view (all its neighbours visible) short of our length also counts: the rest of the body is behind a portal.
+constexpr bool F_STRADDLE_SEEN = true;
+// F_CYCLE2: during a loop breakout, farm / scout / crowd / convergence targets (v5.6-v5.8) took over the steering on 826 of
+// 2707 breakout turns and led the dragon back; only 43% of breakouts got 5 tiles away. They now wait for the breakout, and
+// the patrol target is the breakout point itself rather than the best-scored tile in view. And a dragon circling on purpose
+// (waiting for a rendezvous, feeding, in ambush) is not broken out: those were 42% of the breakouts.
+constexpr bool F_BREAKOUT_HOLD = true;
+// F_ALPHA_PORTAL: the alpha named "the longest teammate in view" as its heir, but the handover goes by sonar and stops at
+// kelp: 0 of 13 heirs in 78 games heard it (trauma's walls stopped three of four beams at the sender). The heir is now the
+// longest teammate a straight beam from our head reaches. In the same 78 games none was, so the capture releases the role
+// (as it did in effect before); the endgame apex election refills it.
+constexpr bool F_HEIR_BEAM = true;
 
 // v5.4 modules, switchable the same way.
 constexpr bool F_SPAWN_CASCADE = true; // round 0: split L-2 again and again, so every spawn body is 2-long units at once
@@ -2547,6 +2563,9 @@ class Brain {
 
     // Leave the loop the last `span` positions traced: head away from its centroid for 10 rounds.
     void break_loop(int span) {
+        // v5.9e (F_BREAKOUT_HOLD): circling on purpose is not a loop: a rendezvous that is not due yet (F_RENDEZVOUS), the
+        // endgame feed, an ambush waiting for its enemy. 42% of breakouts broke one of these.
+        if (F_BREAKOUT_HOLD && (s.rdv_goal >= 0 || round >= feed_round() || s.last_mode == Mode::Ambush)) return;
         int n = static_cast<int>(s.recent_path.size());
         int sx = 0, sy = 0, k = 0;
         for (int i = std::max(0, n - span); i < n; ++i, ++k) {
@@ -3471,6 +3490,33 @@ class Brain {
             auto part = t.get_dragon();
             if (!part || part->get_id() != c.get_id() || part->is_head()) continue;
             if (s.cells[index(t.get_position())].edge[di(part->get_dir())] > 0) return true;
+        }
+        // v5.9e (F_STRADDLE_SEEN): born straddling (our parent's body crossed a portal), with the segment that faces across
+        // out of view. The visible chain from the head stops short of our length at a segment whose neighbours are all in
+        // view, so the next segment toward the tail is behind a portal edge.
+        if (F_STRADDLE_SEEN) {
+            auto body = body_tiles();
+            if (static_cast<int>(body.size()) < c.get_length() && chebyshev(here, body.back()) <= 2) return true;
+        }
+        return false;
+    }
+
+    // v5.9e (F_HEIR_BEAM): a straight beam from our head (not the one into our own neck) ends on teammate `id` within view.
+    bool beam_hits_friend(int id) const {
+        int back = (di(c.get_dir()) + 2) % 4;
+        for (int d = 0; d < 4; ++d) {
+            if (d == back) continue;
+            Position p = here;
+            for (int k = 0; k < 3; ++k) {
+                if (s.cells[index(p)].edge[d] != 0) break; // kelp, portal or unknown
+                p = step(p, d);
+                auto t = c.get_tile(p);
+                if (!t) break;
+                auto part = t->get_dragon();
+                if (!part) continue;
+                if (part->get_team() == c.get_team() && part->get_id() == id) return true;
+                break;
+            }
         }
         return false;
     }
@@ -5773,6 +5819,7 @@ class Brain {
             int best_id = -1, best_len = -1;
             for (const auto &f : friends) {
                 int flen = friendly_visible_length(f.get_id());
+                if (F_HEIR_BEAM && !beam_hits_friend(f.get_id())) continue;
                 if (flen > best_len || (flen == best_len && f.get_id() < best_id)) { best_len = flen; best_id = f.get_id(); }
             }
             if (is_primary_alpha_id(c.get_id())) s.primary_demoted = true;
@@ -5863,8 +5910,10 @@ class Brain {
             }
         }
 
+        // v5.9e (F_BREAKOUT_HOLD): a loop breakout (F_CYCLE2) is not overridden by the errands below.
+        bool breakout = F_CYCLE2 && F_BREAKOUT_HOLD && round < s.cycle_break_until;
         // v5.8: nothing to eat in view and no errand: a farm nobody works (ours, or its mirror image) comes first.
-        if (F_FARM_SEEK && !target && !feed && !threatened && !s.alpha && !s.resident && !s.camping && !s.evacuating &&
+        if (F_FARM_SEEK && !breakout && !target && !feed && !threatened && !s.alpha && !s.resident && !s.camping && !s.evacuating &&
             !s.patch_camp &&
             round < feed_start)
             if (auto g = farm_goal_target()) {
@@ -5872,7 +5921,7 @@ class Brain {
                 mode = Mode::Disperse;
             }
         // v5.6: nothing to eat in view and no errand: walk to a mirrored hotspot a teammate reported.
-        if (F_MIRROR_SCOUT && !target && !feed && !threatened && !s.alpha && !s.resident && !s.camping && !s.patch_camp &&
+        if (F_MIRROR_SCOUT && !breakout && !target && !feed && !threatened && !s.alpha && !s.resident && !s.camping && !s.patch_camp &&
             !s.evacuating && c.get_length() <= 3 && round < feed_start && !(uniform_map() && !F_POCKET_SEEK)) {
             if (auto g = scout_goal()) {
                 target = *g;
@@ -5882,7 +5931,7 @@ class Brain {
         // v5.7 (a1): a crowd (CROWD_HEADS or more other non-alpha heads within 4) shares whatever is here; one member at a
         // time heads for a known rich spot at least 6 away, even with food in view (trophy: seven dragons sat in one handle
         // all game while the cup and the far handle filled up).
-        if (F_HOTSPOT2 && F_MIRROR_SCOUT && !feed && !retreating && !threatened && !s.alpha && !s.resident && !s.camping && s.farm_goal < 0 &&
+        if (F_HOTSPOT2 && F_MIRROR_SCOUT && !breakout && !feed && !retreating && !threatened && !s.alpha && !s.resident && !s.camping && s.farm_goal < 0 &&
             !s.patch_camp &&
             !s.evacuating && c.get_length() <= 4 && round < feed_start && !(uniform_map() && !F_POCKET_SEEK) &&
             !(pearls && distance[index(*pearls)] <= 2)) {
@@ -5909,7 +5958,7 @@ class Brain {
         }
 
         // v5.7: a long teammate is about to trade with an intruder: be there to eat the drop.
-        if (!target && !feed && !threatened)
+        if (!target && !feed && !threatened && !breakout)
             if (auto cp = convergence_point()) {
                 target = *cp;
                 DIAG("converge " << c.get_id() << ' ' << round << ' ' << cp->x << ',' << cp->y);
@@ -5918,7 +5967,9 @@ class Brain {
         bool patrol_only = false;
         if (!target && !feed && !threatened && !(receiver_alpha && round >= feed_start && !friends.empty()) &&
             dist(here, s.sector_target) > 2) {
-            target = exploration_target();
+            // v5.9e (F_BREAKOUT_HOLD): a breakout walks for its breakout point; the exploration score (tile age up to 56,
+            // progress toward the point at most 9) kept it among the loop's neighbours.
+            target = breakout ? std::nullopt : exploration_target();
             if (!target) target = s.sector_target;
             mode = s.dispersing ? Mode::Disperse : Mode::Forage;
             patrol_only = true;

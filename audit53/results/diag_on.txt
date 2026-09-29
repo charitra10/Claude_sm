@@ -1,0 +1,2 @@
+on           n=78 loop=4.4/g away10=0.43 reloop=0.09 ate20=0.45 | cap=40 capsplit=0 capho=35 none=22 sacr=282 | hochild=4399 claimed=2915 | hz=2852 rx/hz=11.79 entries=635 knew=112 long=284 | pre=36.0/g rel=3.2/g
+   breakout targets: other:826 explore:575 feed:385 pearl:383 portal:256 ambush:247 rdv:28 rem:6 future:1

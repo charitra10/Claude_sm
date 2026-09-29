@@ -1,0 +1,2 @@
+noHZRR       n=78 loop=4.3/g away10=0.43 reloop=0.10 ate20=0.47 | cap=39 capsplit=0 capho=34 none=22 sacr=184 | hochild=4123 claimed=2790 | hz=2810 rx/hz=8.74 entries=735 knew=114 long=345 | pre=35.8/g rel=3.5/g
+   breakout targets: other:809 explore:626 pearl:316 ambush:288 feed:282 portal:210 rdv:27 rem:9 future:1

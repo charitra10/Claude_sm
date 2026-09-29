@@ -1,0 +1,2 @@
+noPFIX       n=78 loop=4.6/g away10=0.42 reloop=0.08 ate20=0.47 | cap=38 capsplit=0 capho=34 none=21 sacr=138 | hochild=4235 claimed=2852 | hz=2854 rx/hz=12.15 entries=686 knew=141 long=324 | pre=0.0/g rel=0.0/g
+   breakout targets: other:685 explore:545 feed:438 pearl:420 portal:326 ambush:233 rdv:39 rem:9 none:3

@@ -1,0 +1,2 @@
+noREPEL      n=78 loop=4.2/g away10=0.39 reloop=0.10 ate20=0.49 | cap=42 capsplit=0 capho=37 none=22 sacr=196 | hochild=3853 claimed=2480 | hz=2770 rx/hz=11.85 entries=711 knew=164 long=359 | pre=34.1/g rel=3.0/g
+   breakout targets: other:689 explore:468 pearl:394 ambush:298 portal:275 feed:263 rdv:30 rem:8 none:1

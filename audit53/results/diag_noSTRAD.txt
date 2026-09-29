@@ -1,0 +1,2 @@
+noSTRAD      n=78 loop=4.2/g away10=0.42 reloop=0.07 ate20=0.45 | cap=41 capsplit=0 capho=35 none=22 sacr=274 | hochild=4161 claimed=2616 | hz=2808 rx/hz=12.54 entries=659 knew=121 long=301 | pre=36.1/g rel=3.2/g
+   breakout targets: other:770 explore:535 pearl:373 feed:356 ambush:242 portal:230 rdv:23 rem:8 future:2

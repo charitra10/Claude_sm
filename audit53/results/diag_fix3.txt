@@ -1,0 +1,2 @@
+fix3         n=78 loop=2.1/g away10=0.40 reloop=0.06 ate20=0.49 | cap=40 capsplit=0 capho=35 none=35 sacr=181 | hochild=4346 claimed=2808 | hz=3018 rx/hz=12.16 entries=695 knew=150 long=317 | pre=38.2/g rel=2.8/g
+   breakout targets: explore:849 pearl:253 portal:97 ambush:50 feed:26 other:23 rdv:12 rem:8 none:5 future:1
