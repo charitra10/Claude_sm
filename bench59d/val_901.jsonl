@@ -104,3 +104,9 @@
 {"challenger": "v5.9", "chal_hash": "d5b65bb2", "opponent": "v59orig", "map": "dilemma", "seed": 904, "side": "A", "outcome": "L", "winner": "B", "method": "by elimination", "round": 104, "secs": 2.423887252807617}
 {"challenger": "v5.9", "chal_hash": "d5b65bb2", "opponent": "v59orig", "map": "dilemma", "seed": 905, "side": "B", "outcome": "W", "winner": "B", "method": "by elimination", "round": 61, "secs": 1.6424858570098877}
 {"challenger": "v5.9", "chal_hash": "d5b65bb2", "opponent": "v59orig", "map": "dilemma", "seed": 905, "side": "A", "outcome": "L", "winner": "B", "method": "by elimination", "round": 104, "secs": 2.7373132705688477}
+{"challenger": "v5.9", "chal_hash": "d5b65bb2", "opponent": "v59orig", "map": "dilemma", "seed": 906, "side": "B", "outcome": "W", "winner": "B", "method": "by elimination", "round": 61, "secs": 1.8531410694122314}
+{"challenger": "v5.9", "chal_hash": "d5b65bb2", "opponent": "v59orig", "map": "dilemma", "seed": 906, "side": "A", "outcome": "L", "winner": "B", "method": "by elimination", "round": 159, "secs": 3.5315682888031006}
+{"challenger": "v5.9", "chal_hash": "d5b65bb2", "opponent": "v59orig", "map": "portals", "seed": 901, "side": "A", "outcome": "L", "winner": "B", "method": "on length", "round": 500, "secs": 19.3053777217865}
+{"challenger": "v5.9", "chal_hash": "d5b65bb2", "opponent": "v59orig", "map": "portals", "seed": 902, "side": "A", "outcome": "W", "winner": "A", "method": "on length", "round": 500, "secs": 18.459340810775757}
+{"challenger": "v5.9", "chal_hash": "d5b65bb2", "opponent": "v59orig", "map": "portals", "seed": 901, "side": "B", "outcome": "W", "winner": "B", "method": "on length", "round": 500, "secs": 19.242204427719116}
+{"challenger": "v5.9", "chal_hash": "d5b65bb2", "opponent": "v59orig", "map": "portals", "seed": 902, "side": "B", "outcome": "W", "winner": "B", "method": "on length", "round": 500, "secs": 19.23123025894165}
