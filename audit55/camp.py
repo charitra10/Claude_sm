@@ -9,6 +9,7 @@ from sim import Game  # noqa: E402
 
 AWAY = 15; SOON = 12
 d = sys.argv[1]; verbose = '-v' in sys.argv
+MIN = int(next((a[6:] for a in sys.argv if a.startswith('--min=')), '1'))
 tot = collections.Counter(); ex = []
 for f in sorted(os.listdir(d)):
     if not f.endswith('.replay'): continue
@@ -50,10 +51,15 @@ for f in sorted(os.listdir(d)):
         rnd, ins, pay, alive = snaps[k]
         _, pins, _, _ = snaps[k - 1]
         for c, who in pins.items():
+            if len(st.chambers[c]['tiles']) < MIN: continue
             if len(who) >= 2: tot['crowded_rounds'] += 1
             if ins.get(c): continue
             if not all(j in alive for j in who): continue
             back = any(snaps[kk][1].get(c) for kk in range(k + 1, min(len(snaps), k + AWAY)))
+            back12 = [kk for kk in range(k + 1, min(len(snaps), k + 13)) if who & snaps[kk][1].get(c, set())]
+            if len(who) == 1:
+                tot['lone_exit'] += 1
+                if back12: tot['lone_exit_same_back12'] += 1; tot['lone_exit_back_rounds'] += back12[0] - k
             if back: tot['leave_returned'] += 1; continue
             now, soon = pay[c]
             key = 'lone' if len(who) == 1 else 'all'

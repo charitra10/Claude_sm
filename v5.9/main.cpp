@@ -90,6 +90,20 @@ constexpr bool F_MANTLE_CASCADE = false; // (part of F_MANTLE) the round-0 casca
 constexpr bool F_MANTLE_PROMOTE = false; // (part of F_MANTLE) a feeder longer than the apex it reaches takes the role
 constexpr int MANTLE_MIN_CHILD = 4;    // smallest split child that takes the alpha role (3 in the round-0 cascade)
 constexpr int CAMP_DENSE_HORIZON = 60, CAMP_SOON = 12, HARVEST_COOLDOWN = 6, MANTLE_GUARD = 40;
+// v5.9e: fixes from the behavioural audit of the v5.5 modules (strategyV_5_9e.md, audit55/).
+// F_HARVEST_FIX: the path-based back harvest (v5.5 geometry, still the fallback when the tail BFS finds nothing) counted
+// pearls on the tail's old path without asking whether the child could walk to them: 117 of its 268 children ate nothing
+// in 8 rounds, 84 ate 2+ (tail BFS: 153 of 213). Now only pearls a child born on the tail can reach count (see reach_harvest).
+constexpr bool F_HARVEST_FIX = true;
+constexpr int HARVEST_REACH = 6; // (F_HARVEST_FIX) steps from the tail within which the child's pearls must lie
+constexpr bool HARVEST_UNSEEN = false; // (F_HARVEST_FIX) out-of-view tiles that refill every round count as pearls
+// F_SCOUT_FIX (F_MIRROR_SCOUT): of 4845 scout claims in 48 games, 3171 were dropped by F_PAIR_SEP (it clears the goal of any
+// dragon beside a teammate for 3 turns), 296 timed out, 997 arrived; 72% of arrivals ate nothing in the next 10 rounds
+// (0.44 pearls against 0.48 at the scout's own rate). "Arrived" was 2 tiles in a straight line, through kelp too (a room
+// across a wall), and an arriving scout claimed the next spot at once. Now: arrival needs a walk of at most SCOUT_ARRIVE
+// moves, the pair rule only drops the goal of the dragon farther from it, and a scout forages SCOUT_REST rounds on arrival.
+constexpr bool F_SCOUT_FIX = true;
+constexpr int SCOUT_ARRIVE = 4, SCOUT_REST = 10;
 
 // v5.6 modules, switchable the same way.
 constexpr bool F_DRY_EVICT = true;    // leave a portal chamber at once when no pearl lies in it and none is due soon
@@ -427,6 +441,7 @@ struct DragonState {
     std::array<std::array<int, 3>, 8> camp_seen{};                // (teammate ID, first and last round seen in our chamber)
     bool camping = false;                                         // we are the one dragon holding a paying chamber
     int harvest_round = -1000, sprint_round = -1000;
+    int scout_rest_until = -1000; // v5.9e (F_SCOUT_FIX): just reached a scout spot: forage here, claim no other spot yet
     int mantle_round = -1000, mantle_from = -1;                   // we took the alpha role from our parent this round
     int mantle_send = -1000, mantle_child_len = 0;                // we gave it away: tell the child and the team
     std::array<std::pair<int, int>, 8> demoted{};                 // (ex-alpha ID, round it gave the role away)
@@ -1284,7 +1299,8 @@ class Brain {
             if (round > s.goal_until) {
                 DIAG("scoutgiveup " << c.get_id() << ' ' << round << ' ' << sc.p.x << ',' << sc.p.y);
                 s.goal = -1;
-            } else if (dist(here, sc.p) <= 2) {
+            } else if (dist(here, sc.p) <= 2 && (!F_SCOUT_FIX || distance[index(sc.p)] <= SCOUT_ARRIVE)) {
+                if (F_SCOUT_FIX) s.scout_rest_until = round + SCOUT_REST;
                 int n = 0;
                 for (const auto &t : c.get_tiles()) n += t.has_pearl();
                 DIAG("scoutarrive " << c.get_id() << ' ' << round << ' ' << sc.p.x << ',' << sc.p.y << " pearls " << n);
@@ -1294,6 +1310,7 @@ class Brain {
                 return sc.p;
             }
         }
+        if (F_SCOUT_FIX && round <= s.scout_rest_until) return {};
         int best = -1, best_d = INF;
         for (int i = 0; i < MAX_SCOUTS; ++i) {
             const auto &sc = s.scouts[i];
@@ -3509,6 +3526,7 @@ class Brain {
             if (dist(e.position, here) <= 4) return {};
         if (F_TAIL_BFS)
             if (auto a = tail_bfs_harvest()) return a;
+        if (F_HARVEST_FIX) return reach_harvest();
         if (round - s.sprint_round <= len + 1) return {};
         // Our body is the last `len` distinct head positions (no sprint since); older ones are where the tail has been.
         std::array<Position, 40> seq;
@@ -3578,7 +3596,8 @@ class Brain {
             if (k > 0) {
                 auto t = c.get_tile(p);
                 // A pearl the head reaches about as soon is the head's (it may be on its way there already).
-                if (t && t->has_pearl() && (distance[index(p)] >= INF || distance[index(p)] > k + 2)) ++gain;
+                if (t && t->has_pearl() && (distance[index(p)] >= INF || distance[index(p)] > k + 2) && !harvest_taken(p, k))
+                    ++gain;
             }
             if (k >= 6) continue;
             for (int d = 0; d < 4; ++d) {
@@ -3597,6 +3616,73 @@ class Brain {
         s.harvest_round = round;
         DIAG("tailbfs " << c.get_id() << ' ' << round << " len " << len << " gain " << gain << " alpha " << s.alpha
                         << " tail " << tail.x << ',' << tail.y);
+        return Action{{}, 2, Mode::Split, false};
+    }
+
+    // v5.9e (F_HARVEST_FIX): a teammate head in view that gets to p in fewer moves than a child born on our tail (k steps
+    // from it) will take it: not the child's. (Devil's centre: children born into a jam of our own dragons ate nothing.)
+    bool harvest_taken(Position p, int k) const {
+        if (!F_HARVEST_FIX) return false;
+        for (const auto &f : friends)
+            if ((F_TRUE_MOVES ? moves_of(f, p) : dist(f.position, p)) < k) return true;
+        return false;
+    }
+
+    // v5.9e (F_HARVEST_FIX): the back harvest when the tail BFS above found nothing (a body longer than the view, or pearls
+    // out of view). The tail is the visible one or the tracked body's (F_CHOKE_LOOP; jumps reset it, so no guessing across a
+    // sprint or a portal). A child born there must be able to walk to what we count: a BFS from the tail (not back through
+    // our neck) over open edges and tiles free as far as we know, HARVEST_REACH steps deep. It counts visible pearls the head
+    // cannot reach about as soon, and out-of-view tiles that refill every round. No free first step: no split.
+    std::optional<Action> reach_harvest() {
+        Position tail, neck;
+        if (!tail_and_neck(tail, neck)) return {};
+        int len = c.get_length();
+        static std::array<Position, 128> q;
+        static std::array<int, 128> dep;
+        int lo = 0, hi = 0, gain = 0, unseen = 0, first = 0;
+        q[hi] = tail;
+        dep[hi++] = 0;
+        space_seen[index(tail)] = true;
+        space_seen[index(neck)] = true;
+        // Our own segments out of view are walls for the child too (the tracked body, when we have it).
+        int nb = F_CHOKE_LOOP && s.hist_n == len ? len : 0;
+        for (int i = 0; i < nb; ++i) space_seen[index(s.hist[i])] = true;
+        while (lo < hi) {
+            Position p = q[lo];
+            int k = dep[lo++];
+            if (k > 0) {
+                auto t = c.get_tile(p);
+                if (t) {
+                    if (t->has_pearl() && (distance[index(p)] >= INF || distance[index(p)] > k + 2) && !harvest_taken(p, k))
+                        ++gain;
+                } else if (HARVEST_UNSEEN && s.cells[index(p)].fast_obs >= 3) {
+                    ++gain; // it refills every round
+                    ++unseen;
+                }
+            }
+            if (k >= HARVEST_REACH) continue;
+            for (int d = 0; d < 4; ++d) {
+                if (s.cells[index(p)].edge[d] != 0) continue;
+                Position n = step(p, d);
+                if (space_seen[index(n)] || hi >= 128) continue;
+                const auto &cell = s.cells[index(n)];
+                if (cell.seen < 0) continue;
+                if (!walkable(n)) continue; // out of view: free as far as we know (our own tail left it)
+                space_seen[index(n)] = true;
+                q[hi] = n;
+                dep[hi++] = k + 1;
+                if (k == 0) ++first;
+            }
+        }
+        for (int i = 0; i < hi; ++i) space_seen[index(q[i])] = false;
+        for (int i = 0; i < nb; ++i) space_seen[index(s.hist[i])] = false;
+        space_seen[index(neck)] = false;
+        int need = s.alpha ? 3 : 2;
+        if (F_SPLIT_CAP && !s.alpha && over_cap()) need = std::max(need, 2);
+        if (first == 0 || gain < need) return {};
+        s.harvest_round = round;
+        DIAG("harvest " << c.get_id() << ' ' << round << " len " << len << " gain " << gain << " alpha " << s.alpha
+                        << " tail " << tail.x << ',' << tail.y << " reach 1 unseen " << unseen);
         return Action{{}, 2, Mode::Split, false};
     }
 
@@ -5610,7 +5696,9 @@ class Brain {
             if (mate && s.pair_turns >= PAIR_TURNS && !pearls && c.get_id() > mate->get_id()) {
                 set_heading_away(-delta(here.x, mate->position.x, w), -delta(here.y, mate->position.y, h));
                 s.pair_turns = 0;
-                s.goal = -1;      // a scout spot or rendezvous we share with it: let it have it
+                // a scout spot or rendezvous we share with it: let it have it (F_SCOUT_FIX: only one it is nearer to)
+                if (!F_SCOUT_FIX || s.goal < 0 || dist(mate->position, s.scouts[s.goal].p) <= dist(here, s.scouts[s.goal].p))
+                    s.goal = -1;
                 s.rdv_goal = -1;
                 s.rem_until = -1000;
                 DIAG("pairsep " << c.get_id() << ' ' << round << " from " << mate->get_id());
