@@ -24,6 +24,10 @@ C++ bots for **UNSW Battlecode** (a snake-like "dragons" game on a toroidal grid
   six reported situations) and v5.9's fixes for them; parity with v5.8 in self-play. Raw results in `bench58/N1_*`, `N2_*`,
   `val59.jsonl`. Its second half covers the second brief (v5.9b: 12 items from replays `M510524`..`M514761`) and the
   kamikaze work (v5.9c: exchange strikes, support, flank approach; 64/96 vs v5.8), with results in `bench59b/`.
+- `strategyV_5_9e.md`: behavioural audit of the eight v5.3 modules in v5.9 (does each do what it was built for, measured on
+  replays and traces, independently of win rate), the fixes in `v5.9/main.cpp` ("v5.9e" flag block below
+  `PORTAL_RESIDENCY`: `F_STRADDLE_SEEN`, `F_BREAKOUT_HOLD`, `F_HEIR_BEAM`), and fresh-seed results. Tools and metric
+  summaries in `audit53/` (see its README), raw results in `bench59e/`.
 - `strategyV_5_10.md`: v5.10's 13 requested modules (`F_*` flags in the "v5.10 modules" block of `v5.10/main.cpp`) from the
   ladder battle in `battle-M604164-replays/` plus `Aut_1.replay` / `Trpy_1.replay` (we are team B in those two), the 8179
   guard sonar tag, forward-selection ablations, fresh-seed results, and the analysis of why all ten battle games were lost.
