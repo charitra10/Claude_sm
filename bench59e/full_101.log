@@ -306,3 +306,7 @@ challenger v5.9e@ef957dcc vs v5.9orig@7fcb5841, v5.8@ae46c22d; 13 maps x 8 seeds
 [ 305/416] v5.8     queen_of_spades                seed 101 side A -> W (on length, r500, 5s)
 [ 306/416] v5.8     queen_of_spades                seed 101 side B -> W (by elimination, r259, 3s)
 306 done, 110 to play
+[1/110] v5.8 queen_of_spades 102 A -> W
+[2/110] v5.8 queen_of_spades 102 B -> L
+[3/110] v5.8 queen_of_spades 103 A -> W
+[4/110] v5.8 queen_of_spades 103 B -> W

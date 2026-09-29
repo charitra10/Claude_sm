@@ -304,3 +304,7 @@
 {"challenger": "v5.9e", "chal_hash": "ef957dcc", "opponent": "v5.8", "map": "portals", "seed": 108, "side": "B", "outcome": "W", "winner": "B", "method": "on length", "round": 500, "secs": 11.175492525100708}
 {"challenger": "v5.9e", "chal_hash": "ef957dcc", "opponent": "v5.8", "map": "queen_of_spades", "seed": 101, "side": "A", "outcome": "W", "winner": "A", "method": "on length", "round": 500, "secs": 4.583868026733398}
 {"challenger": "v5.9e", "chal_hash": "ef957dcc", "opponent": "v5.8", "map": "queen_of_spades", "seed": 101, "side": "B", "outcome": "W", "winner": "B", "method": "by elimination", "round": 259, "secs": 3.194002389907837}
+{"challenger": "v5.9e", "chal_hash": "ef957dcc", "opponent": "v5.8", "map": "queen_of_spades", "seed": 102, "side": "A", "outcome": "W", "winner": "A", "method": "by elimination", "round": 301, "secs": 6.601093769073486}
+{"challenger": "v5.9e", "chal_hash": "ef957dcc", "opponent": "v5.8", "map": "queen_of_spades", "seed": 102, "side": "B", "outcome": "L", "winner": "A", "method": "on length", "round": 500, "secs": 10.302860498428345}
+{"challenger": "v5.9e", "chal_hash": "ef957dcc", "opponent": "v5.8", "map": "queen_of_spades", "seed": 103, "side": "A", "outcome": "W", "winner": "A", "method": "on length", "round": 500, "secs": 10.597176551818848}
+{"challenger": "v5.9e", "chal_hash": "ef957dcc", "opponent": "v5.8", "map": "queen_of_spades", "seed": 103, "side": "B", "outcome": "W", "winner": "B", "method": "by elimination", "round": 290, "secs": 6.041638612747192}
