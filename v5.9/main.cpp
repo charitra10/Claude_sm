@@ -282,6 +282,13 @@ constexpr bool F_RESERVE_AIM = false; // measured: settled-chamber entries 125 -
 constexpr bool F_RESERVE_ALL = false; // reserve every portal of the chamber we hold, in rotation (default: 90 vs 43 settled-chamber
                                      // entries in 4 games, worse: off)
 
+// v5.9e: fixes from the behavioural audit of the v5.6 modules (audit52/analyze56.py, strategyV_5_9e.md).
+// F_SYMMETRY: inference is right (0 wrong of 12000 resolutions / adoptions in 72 games), but newborns learn it late: about
+// 9 rounds after birth, and 21% never do. F_SYM_HANDOFF gives a split child the symmetry from its parent on the split turn
+// (the beam into our own body refracts out of the tail into the child), on beams no other hand-off is using. Measured:
+// newborn lag 8.8 -> 7.0 rounds, never 21% -> 18%, 42 vs 46 wins / 72 (and 52 / 72 with no symmetry at all): off.
+constexpr bool F_SYM_HANDOFF = false;
+
 // Sonar tags carried in the 13-bit alpha-ID field. 8191 already meant "no alpha"; real IDs never get
 // near these values, and every other field of the packet keeps its usual meaning.
 constexpr int HAZARD_TAG = 8190, PORTAL_TAG = 8189, HANDOVER_TAG = 8188;
@@ -6816,6 +6823,20 @@ class Brain {
                 s.probe_pos = post;
                 s.probe_dir = s.probe_plan_dir;
                 DIAG("probesend " << c.get_id() << ' ' << round << " at " << post.x << ',' << post.y << " dir " << s.probe_dir);
+            }
+            // v5.9e (F_SYM_HANDOFF): our split child is born knowing nothing; hand it the map symmetry on the beams that
+            // refract into it and carry no other hand-off.
+            if (F_SYMMETRY && F_SYM_HANDOFF && a.child && s.sym >= 0 && !critical && !uniform_map()) {
+                int hits = beams_into_child(a.child);
+                for (int d = 0; d < 4; ++d) {
+                    if (!(hits >> d & 1)) continue;
+                    int tag = used[d] ? static_cast<int>((beam[d] >> 49) & SONAR_ID_MASK) : -1;
+                    if (tag == BARRED_TAG || tag == MANTLE_TAG || tag == FARM_TAG || tag == HANDOVER_TAG || tag == PROBE_TAG)
+                        continue;
+                    beam[d] = scout_packet({0, 0}, round, 0, false);
+                    used[d] = true;
+                    DIAG("symhand " << c.get_id() << ' ' << round << " child " << a.child << " dir " << d);
+                }
             }
             for (int d = 0; d < 4; ++d)
                 if (used[d]) c.send_sonar(DIRS[d], beam[d]);
