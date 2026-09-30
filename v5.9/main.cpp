@@ -97,30 +97,6 @@ constexpr int CAMP_DENSE_HORIZON = 60, CAMP_SOON = 12, HARVEST_COOLDOWN = 6, MAN
 constexpr bool F_HARVEST_FIX = true;
 constexpr int HARVEST_REACH = 6; // (F_HARVEST_FIX) steps from the tail within which the child's pearls must lie
 constexpr bool HARVEST_UNSEEN = false; // (F_HARVEST_FIX) out-of-view tiles that refill every round count as pearls
-// F_SCOUT_FIX (F_MIRROR_SCOUT): of 4845 scout claims in 48 games, 3171 were dropped by F_PAIR_SEP (it clears the goal of any
-// dragon beside a teammate for 3 turns), 296 timed out, 997 arrived; 72% of arrivals ate nothing in the next 10 rounds
-// (0.44 pearls against 0.48 at the scout's own rate). "Arrived" was 2 tiles in a straight line, through kelp too (a room
-// across a wall), and an arriving scout claimed the next spot at once. Now: arrival needs a walk of at most SCOUT_ARRIVE
-// moves, the pair rule only drops the goal of the dragon farther from it, and a scout forages SCOUT_REST rounds on arrival.
-constexpr bool F_SCOUT_FIX = true;
-constexpr int SCOUT_ARRIVE = 4, SCOUT_REST = 10;
-// F_RDV_FIX (F_RENDEZVOUS): 8847 trips in 48 games, 19% on time, 83% ate nothing at the cluster (0.34 pearls a trip); with the
-// module off the team ate as many pearls. Trips were timed by straight-line distance (walls ignored) and allowed to arrive up
-// to 15 rounds late (closed trips arrived 5.4 rounds after the spawn on average, when the pile was gone). Now the walk is the
-// route over the remembered map, and a trip starts (and goes on) only if it arrives within RDV_LATE rounds of the spawn.
-constexpr bool F_RDV_FIX = true;
-constexpr int RDV_LATE = 2;
-// F_FARMSEEK_FIX (F_FARM_SEEK, v5.8): of 776 farm trips that ended in 48 games, 69 reached the farm (stronghold 0 of 237,
-// trauma 0 of 55); 10% of trips ate 2+ pearls there. Trips were timed and chosen by straight-line distance (stronghold's farm
-// is 3 tiles from open ground through kelp and 20 moves round), and went on to farms a teammate was diving (its mouth is no
-// place to wait). Now the walk is the route over the remembered map, portals we know included, and a farm with one of ours
-// visibly inside is dropped.
-// F_TRAP_DIRECT (F_TRAP_AVOID, v5.8): long dragons (5+) ended in "no move survives" rescue splits as often with the room
-// scoring as without it (48 games: 4774 / 4831 rescues at length 5+, 2319 / 2328 at 8+): the room check is in the move scorer
-// only, and most moves (pearls, remembered pearls, portals, feeding) take the direct path, which never asks. Now a direct step
-// that leaves a long dragon less room than the scorer wants goes to the scorer.
-constexpr bool F_TRAP_DIRECT = true;
-constexpr bool F_FARMSEEK_FIX = false; // tried: arrivals 69 -> 26, paid trips 212 -> 74 (48 games); not shipped
 
 // v5.6 modules, switchable the same way.
 constexpr bool F_DRY_EVICT = true;    // leave a portal chamber at once when no pearl lies in it and none is due soon
@@ -458,7 +434,6 @@ struct DragonState {
     std::array<std::array<int, 3>, 8> camp_seen{};                // (teammate ID, first and last round seen in our chamber)
     bool camping = false;                                         // we are the one dragon holding a paying chamber
     int harvest_round = -1000, sprint_round = -1000;
-    int scout_rest_until = -1000; // v5.9e (F_SCOUT_FIX): just reached a scout spot: forage here, claim no other spot yet
     int mantle_round = -1000, mantle_from = -1;                   // we took the alpha role from our parent this round
     int mantle_send = -1000, mantle_child_len = 0;                // we gave it away: tell the child and the team
     std::array<std::pair<int, int>, 8> demoted{};                 // (ex-alpha ID, round it gave the role away)
@@ -1083,9 +1058,7 @@ class Brain {
         if (s.rdv_goal >= 0) {
             auto &r = s.rdv[s.rdv_goal];
             int k = dist(here, r.p);
-            int walk = F_RDV_FIX ? (memory_bfs(), mem_depth[index(r.p)]) : 0;
-            bool late = F_RDV_FIX && k > 1 && (walk >= INF || round + walk > r.t + RDV_LATE);
-            if (r.value == 0 || round > r.t + 15 || (k <= 1 && round >= r.t) || late) {
+            if (r.value == 0 || round > r.t + 15 || (k <= 1 && round >= r.t)) {
                 DIAG("rdvdone " << c.get_id() << ' ' << round << ' ' << r.p.x << ',' << r.p.y << " t " << r.t << " k " << k);
                 r.value = 0;
                 s.rdv_goal = -1;
@@ -1099,15 +1072,9 @@ class Brain {
             const auto &r = s.rdv[i];
             if (r.value < RDV_MIN) continue;
             int k = dist(here, r.p), wait = r.t - round;
-            if (F_RDV_FIX) {
-                memory_bfs();
-                k = mem_depth[index(r.p)];
-                if (k >= INF) continue;
-            }
-            if (k < 2 || k > 20 || wait - k > 3 || k - wait > (F_RDV_FIX ? RDV_LATE : 15)) continue;
+            if (k < 2 || k > 20 || wait - k > 3 || k - wait > 15) continue;
             bool nearer = false;
-            for (const auto &f : friends)
-                nearer = nearer || (F_RDV_FIX && F_TRUE_MOVES ? moves_of(f, r.p) : dist(f.position, r.p)) < k;
+            for (const auto &f : friends) nearer = nearer || dist(f.position, r.p) < k;
             if (nearer) continue;
             double sc = r.value / (k + 2.0);
             if (sc > best) { best = sc; pick = i; }
@@ -1324,8 +1291,7 @@ class Brain {
             if (round > s.goal_until) {
                 DIAG("scoutgiveup " << c.get_id() << ' ' << round << ' ' << sc.p.x << ',' << sc.p.y);
                 s.goal = -1;
-            } else if (dist(here, sc.p) <= 2 && (!F_SCOUT_FIX || distance[index(sc.p)] <= SCOUT_ARRIVE)) {
-                if (F_SCOUT_FIX) s.scout_rest_until = round + SCOUT_REST;
+            } else if (dist(here, sc.p) <= 2) {
                 int n = 0;
                 for (const auto &t : c.get_tiles()) n += t.has_pearl();
                 DIAG("scoutarrive " << c.get_id() << ' ' << round << ' ' << sc.p.x << ',' << sc.p.y << " pearls " << n);
@@ -1335,7 +1301,6 @@ class Brain {
                 return sc.p;
             }
         }
-        if (F_SCOUT_FIX && round <= s.scout_rest_until) return {};
         int best = -1, best_d = INF;
         for (int i = 0; i < MAX_SCOUTS; ++i) {
             const auto &sc = s.scouts[i];
@@ -4123,8 +4088,7 @@ class Brain {
             const auto &f = s.farms[s.farm_goal];
             Position a = farm_approach(f);
             bool there = here == a || here == f.p || (distance[index(f.p)] < INF && distance[index(f.p)] <= 4);
-            bool busy = F_FARMSEEK_FIX && f.dir >= 0 && c.get_tile(f.p) && pocket_busy(f.p, f.dir);
-            if (round > s.farm_goal_until || f.value == 0 || there || busy) {
+            if (round > s.farm_goal_until || f.value == 0 || there) {
                 DIAG("farmdone " << c.get_id() << ' ' << round << ' ' << f.p.x << ',' << f.p.y << " k " << dist(here, f.p)
                                  << " there " << there << " v " << f.value);
                 s.farm_goal = -1;
@@ -4140,12 +4104,6 @@ class Brain {
             if (round - f.claim_round <= FARM_CLAIM_TTL && f.claim_id != (c.get_id() & 4095)) continue;
             Position a = farm_approach(f);
             int k = dist(here, a);
-            if (F_FARMSEEK_FIX) {
-                if (f.dir >= 0 && c.get_tile(f.p) && pocket_busy(f.p, f.dir)) continue;
-                memory_bfs();
-                if (mem_depth[index(a)] >= INF) continue;
-                k = mem_depth[index(a)];
-            }
             if (k < 2 || k > (w + h) / 2) continue;
             if (distance[index(f.p)] < INF && distance[index(f.p)] <= 4) continue; // already here
             bool nearer = false;
@@ -4159,7 +4117,6 @@ class Brain {
         f.claim_round = round;
         f.claim_id = c.get_id() & 4095;
         int k = dist(here, farm_approach(f));
-        if (F_FARMSEEK_FIX) k = mem_depth[index(farm_approach(f))];
         s.farm_goal = best;
         s.farm_goal_until = round + 2 * k + 12;
         s.farm_claim_send = round;
@@ -5729,9 +5686,7 @@ class Brain {
             if (mate && s.pair_turns >= PAIR_TURNS && !pearls && c.get_id() > mate->get_id()) {
                 set_heading_away(-delta(here.x, mate->position.x, w), -delta(here.y, mate->position.y, h));
                 s.pair_turns = 0;
-                // a scout spot or rendezvous we share with it: let it have it (F_SCOUT_FIX: only one it is nearer to)
-                if (!F_SCOUT_FIX || s.goal < 0 || dist(mate->position, s.scouts[s.goal].p) <= dist(here, s.scouts[s.goal].p))
-                    s.goal = -1;
+                s.goal = -1;      // a scout spot or rendezvous we share with it: let it have it
                 s.rdv_goal = -1;
                 s.rem_until = -1000;
                 DIAG("pairsep " << c.get_id() << ' ' << round << " from " << mate->get_id());
@@ -6144,11 +6099,6 @@ class Brain {
             if (EXIT_CLEAR_ON && !use_portal && edge_td == 0 && exit_lane(next_td)) iso_risky = true;
             // v5.9c (F_DODGE): a step an enemy would profit from ramming goes to the scorer.
             if (F_DODGE && dodger && edge_td == 0 && strike_risk(next_td) >= DODGE_DIRECT) iso_risky = true;
-            // v5.9e (F_TRAP_DIRECT): not into a pocket our body cannot turn round in (the scorer weighs the room).
-            if (F_TRAP_DIRECT && F_TRAP_AVOID && edge_td == 0 && c.get_length() >= TRAP_MIN_LEN) {
-                int need = std::min(c.get_length(), TRAP_NEED);
-                if (escape_room(next_td, need) < need) iso_risky = true;
-            }
             // v5.9c (F_FLANK): an ambushing kamikaze does not walk down an enemy's line toward it.
             if (F_FLANK && kam && mode == Mode::Ambush && edge_td == 0 && on_enemy_line(next_td)) iso_risky = true;
             // v5.9b: a corridor a teammate is coming along (F_LANE), a tile a teammate comes out of a portal onto

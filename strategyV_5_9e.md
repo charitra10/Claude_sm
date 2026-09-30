@@ -3,7 +3,13 @@
 The v5.5-v5.9 modules were kept or dropped on win rate alone. This audit asks a different question of each module that is
 still switched on and not overridden later: does the behaviour it was written for actually happen? It is measured on the
 full board of the replay (ground truth) and on the bot's own `DIAG` trace. Where a module does not do its job, the cause was
-found and fixed in `v5.9/main.cpp` behind a new switch (block "v5.9e" after the v5.5 constants), and measured again.
+found, a fix was written behind a new switch, and it was measured again.
+
+**Scope of the code change: v5.5 only.** The only fix in `v5.9/main.cpp` is `F_HARVEST_FIX` (block "v5.9e" after the v5.5
+constants). The v5.6-v5.8 modules were audited too, and fixes for four of them were written and measured (`F_SCOUT_FIX`,
+`F_RDV_FIX`, `F_TRAP_DIRECT`, `F_FARMSEEK_FIX`); on request they are **not** in the code. Their findings, the fixes'
+descriptions and results are kept below as notes for later work; the code is in the history of this branch (commit
+`61cabd2`).
 
 The v5.2-v5.4 modules are audited separately (`strategyV_5_9d.md`, another branch); this audit uses that audit's
 `run.py` / `variant.py` and imports its `analyze.py` for map structure (`audit55/analyze52.py`). Tools: `audit55/` (see its
@@ -68,7 +74,7 @@ Five maps where the harvest fires (devil, slithery_fight, portals, queen_ages, s
 | `F_CHOKE_GREEDY` | in a dead end with pearls ahead: no split; split L-2 only at the tip | 3-long heads dying in dead ends 393 / 1615; 2-splits in a dead end with pearls in it 243 / 1032; rear child of the tip split 4.4 / 2.5 long on average | **works** |
 | `F_REENTRY` | a camper pushed out of its chamber goes straight back in | forced exits (the camper's own last decision was "stay"): back within 12 rounds 14 of 43 / 1 of 24 | **works** (rare: ~1 a game) |
 | `F_SYMMETRY` | infer the map's symmetry, share it | wrong resolutions (against the replay's shared countdowns) 0 of 7820; 77% of dragon-turns know the right one | **works** |
-| `F_MIRROR_SCOUT` | idle foragers walk to reported rich spots (and mirror images) and eat there | 4845 claims: 3171 dropped by `F_PAIR_SEP`, 296 timed out, 997 arrived; 72% of arrivals ate nothing in 10 rounds; 0.44 pearls per arrival against 0.48 at the scout's own rate | **does not work** -> fix tried (`F_SCOUT_FIX`), see below |
+| `F_MIRROR_SCOUT` | idle foragers walk to reported rich spots (and mirror images) and eat there | 4845 claims: 3171 dropped by `F_PAIR_SEP`, 296 timed out, 997 arrived; 72% of arrivals ate nothing in 10 rounds; 0.44 pearls per arrival against 0.48 at the scout's own rate | **does not work** -> fix tried (`F_SCOUT_FIX`, not in the code), see below |
 
 ### F_MIRROR_SCOUT
 
@@ -99,11 +105,11 @@ only changed the path-based harvest, which `F_HARVEST_FIX` replaces: dead code w
 | `F_SPLIT_COOL` | the rear child of an escape split makes no voluntary split for 8 rounds | such splits within 8 rounds of birth: 0 | **works** |
 | `F_FEED_CLEAR` | endgame feeders never box the apex in | our longest dragon (10+) dying after round 350 into our own bodies or with no move: 0 | **works** |
 | `F_PROTECT` | a suicide strike only when a teammate is nearer the collision than any other enemy, so we eat the drops | pearls of our strikes' drops eaten by us 61% (2136 / 1362) / 54% (2236 / 1868); strikes 1037 / 1299 | **works** |
-| `F_PAIR_SEP` | teammates travelling side by side with nothing to eat split up | it fires ~450 times a game and the pair does part (2.1 -> 4.9 tiles apart within 6 rounds, 18% together again); idle paired turns overall 14674 / 15062 (noise level): new pairs keep forming. Its side effect, cancelling two thirds of scout trips, is fixed by `F_SCOUT_FIX` | **mechanism works, no measurable effect** |
+| `F_PAIR_SEP` | teammates travelling side by side with nothing to eat split up | it fires ~450 times a game and the pair does part (2.1 -> 4.9 tiles apart within 6 rounds, 18% together again); idle paired turns overall 14674 / 15062 (noise level): new pairs keep forming. Its side effect, cancelling two thirds of scout trips, was addressed by `F_SCOUT_FIX` (not in the code) | **mechanism works, no measurable effect** |
 | `F_CHOKE_LOOP` | stop the split-and-die loop in slithery_fight's spawn corridor | slithery_fight: rescue splits 3618 / 3926, the busiest tile 373 / 491 (4 games); the busiest tiles are still the two corridor ends (16,7) and (23,7), 80-110 tip splits a game each: since v5.8 these are intended farm dives (they pay: 2.44 pearls eaten against 2.02 lost a dive on slithery_fight, 3.7 against 2.1 on trauma and stronghold) | **partial; superseded by `F_FARM`** |
 | `F_REM_COMMIT` | keep the remembered pearl we set off for | turns whose remembered target changed from the turn before 15.7% / 18.3% | **works, weakly** |
 | `F_CHAMBER_ONE` | two dragons never go into one small chamber in the same round | two of ours entering one chamber within a round 55 / 49. Default (18): 12 came in through the room's other portal (`chamber_taken()` only looks at the portal it is about to use; default's rooms have two). Portals (32): the 2x2 loop chambers, where re-entering is exempt by design | **no measurable effect** (not fixed here: it needs every portal of a room, which the v5.2 audit is changing, `F_RESERVE_ALL`) |
-| `F_RENDEZVOUS` | be at a cluster of tiles due to spawn together when it spawns, and eat it | 8847 trips in 48 games; 19% on time; 83% ate nothing at the cluster, 0.34 pearls a trip. Pearls eaten by the team 33753 / 33689 | **does not work** -> fixed (`F_RDV_FIX`) |
+| `F_RENDEZVOUS` | be at a cluster of tiles due to spawn together when it spawns, and eat it | 8847 trips in 48 games; 19% on time; 83% ate nothing at the cluster, 0.34 pearls a trip. Pearls eaten by the team 33753 / 33689 | **does not work** -> fix tried (`F_RDV_FIX`, not in the code) |
 
 ### F_RENDEZVOUS: late by design, and the fix
 
@@ -129,7 +135,7 @@ earlier in the turn) take its cases, so it is superseded and not audited. Not me
 | `F_FARM` (farm harvest) | walking out of a farm, split a 2-long child back into the refilled corridor | 381 farm harvests, 330 children ate 2+ in 8 rounds (3.8 pearls each; the wall deaths are the planned tip deaths). Dead-end dives pay on every map with farms (pearls eaten against length lost per dive: stronghold 3.8 / 2.1, trauma 3.7 / 2.1, autarky 3.0 / 2.0, slithery_fight 2.4 / 2.0) | **works**. Side effect: 290 of the 381 harvests are by alphas, mostly 4-7 long (2180 alpha turns at length 2); `FARM_SPLIT_ALPHA` was switched off in v5.9 for the same reason, but this path has no alpha floor. Not changed |
 | `F_FARM_SEEK` | idle dragons walk to a known farm nobody works | of 776 trips that ended, 69 reached the farm (stronghold 0 of 237, trauma 0 of 55); 10% of trips ate 2+ there. Still, off: dead-end dives 1776 -> 1475, pearls eaten in dead ends 5064 -> 4271; team pearls unchanged (33753 / 33668) | **partial**: more farming, no more food overall. A fix (route length instead of straight-line distance, drop farms a teammate is diving: `F_FARMSEEK_FIX`) halved the trips but cut arrivals 69 -> 26 and paid trips 212 -> 74: **off** |
 | `F_ISOLATED` | alone among enemies: fair trades only, respect their reach | deaths per isolated turn 3.8% / 4.3% (head-on 2.5% / 2.9%); lost trades 96 / 85 | **works, weakly** |
-| `F_TRAP_AVOID` | long dragons do not coil into places they cannot turn round in | "no move survives" rescue splits at length 5+: 4774 / 4831, at 8+: 2319 / 2328; long-dragon wall / self deaths in the open 18 / 18 | **does not work** -> fixed (`F_TRAP_DIRECT`), see below |
+| `F_TRAP_AVOID` | long dragons do not coil into places they cannot turn round in | "no move survives" rescue splits at length 5+: 4774 / 4831, at 8+: 2319 / 2328; long-dragon wall / self deaths in the open 18 / 18 | **does not work** -> fix tried (`F_TRAP_DIRECT`, not in the code), see below |
 | `F_FEED_SCORE` | feeders pick the alpha that will end longest | feed drops eaten by our final longest dragon 10.3% / 10.9%; feeders whose last pick was the final apex 84 / 125 of ~815 (most picked alphas that later handed their mass on in a split and died as the 2-long head) | **no measurable effect** |
 
 ### F_TRAP_AVOID: the direct path never asks
@@ -183,12 +189,15 @@ One fix switched off at a time (the other two on, both seed sets, 384 games each
 Nothing here is significant, but the only fix whose removal brings the build back to v5.9's level is `F_HARVEST_FIX`: if the
 small loss is real, it comes from the harvest fix (fewer, surer harvest children; the extra 2-long units of the old fallback
 may be worth more to the swarm than their own pearls). `F_SCOUT_FIX` and `F_RDV_FIX` are neutral. Candidate final build:
-`F_HARVEST_FIX` off, `F_SCOUT_FIX`, `F_RDV_FIX`, `F_TRAP_DIRECT` on (`bench59e/wr4_fixD_*`, running). Every fix is behind its
-own flag, so any of them can be switched off without touching the rest.
+`F_HARVEST_FIX` off, `F_SCOUT_FIX`, `F_RDV_FIX`, `F_TRAP_DIRECT` on: seed set 1001-1008 119.5/192 (v5.9 122, paired 29 / 26);
+seed set 1101-1108 stopped at 128 games (92, v5.9 better in 19, the build in 22), when the scope was cut to v5.5.
+
+With only v5.5 fixed, what remains to decide is whether `F_HARVEST_FIX` goes on by itself: v5.9 plus the harvest fix alone
+against v5.8, on the same 384 games (`bench59e/wr5_hOnly_*`). With the flag off the bot plays exactly as v5.9 (checked:
+the same game, death for death, on devil seed 3).
 
 ## Code changes in v5.9/main.cpp
 
-- Flags (block "v5.9e" after the v5.5 constants): `F_HARVEST_FIX`, `HARVEST_REACH`, `HARVEST_UNSEEN`, `F_SCOUT_FIX`,
-  `SCOUT_ARRIVE`, `SCOUT_REST`, `F_RDV_FIX`, `RDV_LATE`.
-- `reach_harvest()`, `harvest_taken()` (F_HARVEST_FIX); arrival, rest and pair-rule changes in `scout_goal()` and the
-  `F_PAIR_SEP` block (F_SCOUT_FIX); `DragonState::scout_rest_until`; `rendezvous_target()` (F_RDV_FIX).
+- Flags (block "v5.9e" after the v5.5 constants): `F_HARVEST_FIX`, `HARVEST_REACH`, `HARVEST_UNSEEN`.
+- `reach_harvest()` and `harvest_taken()`; `back_harvest()` calls `reach_harvest()` instead of its path-based fallback, and
+  `tail_bfs_harvest()` skips pearls a teammate reaches sooner. Nothing else in `v5.9/main.cpp` changes.
