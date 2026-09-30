@@ -117,6 +117,29 @@ arrives no more than `RDV_LATE` = 2 rounds after the spawn, is dropped as soon a
 nearer by moves takes it. Result (48 games, the other fixes off): 2223 trips, 40% on time, 0.51 pearls a trip (1.10 per
 on-time trip), team pearls 34983.
 
+## v5.8 modules
+
+Covered elsewhere: `F_POCKET_SEEK` and `F_CHAMBER_MIRROR` (spots for the scouting system, see `F_MIRROR_SCOUT`), `F_FARM`'s
+dead-end rules (see `F_CHOKE`). `F_EARLY_KILL` fired once in 48 games: v5.9c's exchange strikes (`F_EXCHANGE`, checked
+earlier in the turn) take its cases, so it is superseded and not audited. Not measured: `F_STRADDLE_SPLIT`,
+`F_PORTAL_YIELD`, `F_PATCH_CAMP`, `F_FEED_UNGUARD`, `F_SECTOR_FLIP`, `F_ROUTE_PORTAL`.
+
+| module | intended behaviour | measured (on / off) | verdict |
+|---|---|---|---|
+| `F_FARM` (farm harvest) | walking out of a farm, split a 2-long child back into the refilled corridor | 381 farm harvests, 330 children ate 2+ in 8 rounds (3.8 pearls each; the wall deaths are the planned tip deaths). Dead-end dives pay on every map with farms (pearls eaten against length lost per dive: stronghold 3.8 / 2.1, trauma 3.7 / 2.1, autarky 3.0 / 2.0, slithery_fight 2.4 / 2.0) | **works**. Side effect: 290 of the 381 harvests are by alphas, mostly 4-7 long (2180 alpha turns at length 2); `FARM_SPLIT_ALPHA` was switched off in v5.9 for the same reason, but this path has no alpha floor. Not changed |
+| `F_FARM_SEEK` | idle dragons walk to a known farm nobody works | of 776 trips that ended, 69 reached the farm (stronghold 0 of 237, trauma 0 of 55); 10% of trips ate 2+ there. Still, off: dead-end dives 1776 -> 1475, pearls eaten in dead ends 5064 -> 4271; team pearls unchanged (33753 / 33668) | **partial**: more farming, no more food overall. A fix (route length instead of straight-line distance, drop farms a teammate is diving: `F_FARMSEEK_FIX`) halved the trips but cut arrivals 69 -> 26 and paid trips 212 -> 74: **off** |
+| `F_ISOLATED` | alone among enemies: fair trades only, respect their reach | deaths per isolated turn 3.8% / 4.3% (head-on 2.5% / 2.9%); lost trades 96 / 85 | **works, weakly** |
+| `F_TRAP_AVOID` | long dragons do not coil into places they cannot turn round in | "no move survives" rescue splits at length 5+: 4774 / 4831, at 8+: 2319 / 2328; long-dragon wall / self deaths in the open 18 / 18 | **does not work** -> fixed (`F_TRAP_DIRECT`), see below |
+| `F_FEED_SCORE` | feeders pick the alpha that will end longest | feed drops eaten by our final longest dragon 10.3% / 10.9%; feeders whose last pick was the final apex 84 / 125 of ~815 (most picked alphas that later handed their mass on in a split and died as the 2-long head) | **no measurable effect** |
+
+### F_TRAP_AVOID: the direct path never asks
+
+The room check (`escape_room()`: room left after the move, counting our body as it frees up) is a term in the move scorer.
+Most moves never reach the scorer: a pearl, a remembered pearl, a portal or a feeding target in reach takes the direct path,
+which only checks that the next tile has one free neighbour. `F_TRAP_DIRECT`: for a dragon 5+ long, a direct step that
+leaves less room than the scorer wants goes to the scorer instead. Result (48 games, the other fixes off): rescue splits
+at length 8+ 2319 -> 2060 (-11%), at 5+ 4774 -> 4654; rescue splits of long dragons outside dead ends 2707 -> 2429.
+
 ## Win rate
 
 `seedbench.py`, plain builds against v5.8, fresh seeds 1001-1008, the 12 ladder maps, both sides (192 games each). Raw:

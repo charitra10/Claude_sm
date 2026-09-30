@@ -115,6 +115,11 @@ constexpr int RDV_LATE = 2;
 // is 3 tiles from open ground through kelp and 20 moves round), and went on to farms a teammate was diving (its mouth is no
 // place to wait). Now the walk is the route over the remembered map, portals we know included, and a farm with one of ours
 // visibly inside is dropped.
+// F_TRAP_DIRECT (F_TRAP_AVOID, v5.8): long dragons (5+) ended in "no move survives" rescue splits as often with the room
+// scoring as without it (48 games: 4774 / 4831 rescues at length 5+, 2319 / 2328 at 8+): the room check is in the move scorer
+// only, and most moves (pearls, remembered pearls, portals, feeding) take the direct path, which never asks. Now a direct step
+// that leaves a long dragon less room than the scorer wants goes to the scorer.
+constexpr bool F_TRAP_DIRECT = true;
 constexpr bool F_FARMSEEK_FIX = false; // tried: arrivals 69 -> 26, paid trips 212 -> 74 (48 games); not shipped
 
 // v5.6 modules, switchable the same way.
@@ -6139,6 +6144,11 @@ class Brain {
             if (EXIT_CLEAR_ON && !use_portal && edge_td == 0 && exit_lane(next_td)) iso_risky = true;
             // v5.9c (F_DODGE): a step an enemy would profit from ramming goes to the scorer.
             if (F_DODGE && dodger && edge_td == 0 && strike_risk(next_td) >= DODGE_DIRECT) iso_risky = true;
+            // v5.9e (F_TRAP_DIRECT): not into a pocket our body cannot turn round in (the scorer weighs the room).
+            if (F_TRAP_DIRECT && F_TRAP_AVOID && edge_td == 0 && c.get_length() >= TRAP_MIN_LEN) {
+                int need = std::min(c.get_length(), TRAP_NEED);
+                if (escape_room(next_td, need) < need) iso_risky = true;
+            }
             // v5.9c (F_FLANK): an ambushing kamikaze does not walk down an enemy's line toward it.
             if (F_FLANK && kam && mode == Mode::Ambush && edge_td == 0 && on_enemy_line(next_td)) iso_risky = true;
             // v5.9b: a corridor a teammate is coming along (F_LANE), a tile a teammate comes out of a portal onto
