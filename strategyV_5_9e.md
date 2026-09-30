@@ -168,9 +168,23 @@ On this seed set, paired on the same games, the fixed build wins 29 games v5.9 l
 (59.9%); paired, v5.9 better in 45 games, the fixed build in 29 (z = 1.9; queen_of_spades 14 -> 11, queen_ages 14 -> 10,
 stronghold 11 -> 7). **Both sets together (384 games each): v5.9 253 (65.9%), fixed build 243 (63.3%); paired 68 / 58,
 z = 0.9.** So the fixes make their modules do what they were written for, but they do not raise the win rate against v5.8,
-and may cost a little. Runs with one fix switched off at a time (`bench59e/wr3_*`) and the final build with `F_TRAP_DIRECT`
-(`bench59e/wr4_*`, not in the numbers above) are to find out whether one fix is responsible. Every fix is behind its own
-flag, so any of them can be switched off without touching the rest.
+and may cost a little.
+
+One fix switched off at a time (the other two on, both seed sets, 384 games each; `bench59e/wr3_*`):
+
+| build | score | paired against v5.9 (v5.9 better / build better) |
+|---|---|---|
+| v5.9 | 253 (65.9%) | |
+| all three fixes | 243 (63.3%) | 68 / 58, z = 0.9 |
+| without `F_HARVEST_FIX` | **251 (65.4%)** | 61 / 59, z = 0.2 |
+| without `F_SCOUT_FIX` | 241.5 (62.9%) | 62 / 50, z = 1.1 |
+| without `F_RDV_FIX` | 244.5 (63.7%) | 64 / 55, z = 0.8 |
+
+Nothing here is significant, but the only fix whose removal brings the build back to v5.9's level is `F_HARVEST_FIX`: if the
+small loss is real, it comes from the harvest fix (fewer, surer harvest children; the extra 2-long units of the old fallback
+may be worth more to the swarm than their own pearls). `F_SCOUT_FIX` and `F_RDV_FIX` are neutral. Candidate final build:
+`F_HARVEST_FIX` off, `F_SCOUT_FIX`, `F_RDV_FIX`, `F_TRAP_DIRECT` on (`bench59e/wr4_fixD_*`, running). Every fix is behind its
+own flag, so any of them can be switched off without touching the rest.
 
 ## Code changes in v5.9/main.cpp
 
