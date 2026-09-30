@@ -200,6 +200,9 @@ Fixed against original, paired: 20-12 (z = +1.41). The single-fix ablations are 
 into a portal the team already barred), and neither costs games measurably. `F_CASCADE_EXIT` only changes games on autarky
 (8/16 head-to-head: it reshuffles which seeds are won), `F_RESCUE_GATE` fired once in 40 traced games.
 
+CPU in the judge sandbox (trauma, seed 1, against v5.8): p50 5.0M, p99 5.9M, max 6.4M points per turn (budget 100M;
+v5.8 in the same game: max 5.9M). The fixes add O(1) work per turn and one beam simulation per split.
+
 ## New flags
 
 | flag | default | what it does |
