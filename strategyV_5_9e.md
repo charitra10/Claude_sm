@@ -161,9 +161,16 @@ at length 8+ 2319 -> 2060 (-11%), at 5+ 4774 -> 4654; rescue splits of long drag
 | trophy | 9 | 10 | 8 | 9 |
 | **all** | **122/192 (63.5%)** | 128.5 (66.9%) | 123 (64.1%) | **128 (66.7%)** |
 
-Paired on the same games, the fixed build wins 29 games v5.9 loses and loses 23 that v5.9 wins (z = 0.8): the fixes make
-the modules do their job without costing win rate, and the gain is within noise. Switching scouting off (with the other
-fixes on) is no better (123), so scouting stays on with its fix. A second seed set is in `bench59e/wr2_*.jsonl`.
+On this seed set, paired on the same games, the fixed build wins 29 games v5.9 loses and loses 23 that v5.9 wins
+(z = 0.8). Switching scouting off (with the other fixes on) is no better (123), so scouting stays on with its fix.
+
+**A second fresh seed set (1101-1108, 192 games each) went the other way:** v5.9 131/192 (68.2%), all fixes 115/192
+(59.9%); paired, v5.9 better in 45 games, the fixed build in 29 (z = 1.9; queen_of_spades 14 -> 11, queen_ages 14 -> 10,
+stronghold 11 -> 7). **Both sets together (384 games each): v5.9 253 (65.9%), fixed build 243 (63.3%); paired 68 / 58,
+z = 0.9.** So the fixes make their modules do what they were written for, but they do not raise the win rate against v5.8,
+and may cost a little. Runs with one fix switched off at a time (`bench59e/wr3_*`) and the final build with `F_TRAP_DIRECT`
+(`bench59e/wr4_*`, not in the numbers above) are to find out whether one fix is responsible. Every fix is behind its own
+flag, so any of them can be switched off without touching the rest.
 
 ## Code changes in v5.9/main.cpp
 
