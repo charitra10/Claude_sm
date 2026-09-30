@@ -87,7 +87,8 @@ where the scout was.
 
 ## v5.7 modules
 
-Covered elsewhere: `F_CHOKE2` (the dead-end entry rule, see `F_CHOKE`), `F_TAIL_BFS` (see `F_BACK_HARVEST`: 77-80% of its
+Not measured (rare or not behavioural on their own): `F_ASSASSIN` (fires only over 33 units), `F_PORTAL_COST`,
+`F_ROUTE_MEM`, `F_PORTAL_ROAM`, `SCALE_MODE`. Covered elsewhere: `F_CHOKE2` (the dead-end entry rule, see `F_CHOKE`), `F_TAIL_BFS` (see `F_BACK_HARVEST`: 77-80% of its
 children eat 2+), `F_SCOUT_NEAR` / `F_SCOUT_NEARER` / `F_HOTSPOT2` (the scouting system, see `F_MIRROR_SCOUT`). `F_TAIL_DROP`
 only changed the path-based harvest, which `F_HARVEST_FIX` replaces: dead code with the fix on. Off in v5.9 and not audited:
 `F_KAM_CAP`, `F_BARREN`, `F_HYBRID`, `F_SECTOR_HASH`.
@@ -97,6 +98,11 @@ only changed the path-based harvest, which `F_HARVEST_FIX` replaces: dead code w
 | `F_SPLIT_CAP` | no voluntary non-alpha split while the team has more than 33 units | voluntary 2-splits by non-alphas over the cap (harvests and farm splits excluded, as designed): 0 | **works** (the gate holds) |
 | `F_SPLIT_COOL` | the rear child of an escape split makes no voluntary split for 8 rounds | such splits within 8 rounds of birth: 0 | **works** |
 | `F_FEED_CLEAR` | endgame feeders never box the apex in | our longest dragon (10+) dying after round 350 into our own bodies or with no move: 0 | **works** |
+| `F_PROTECT` | a suicide strike only when a teammate is nearer the collision than any other enemy, so we eat the drops | pearls of our strikes' drops eaten by us 61% (2136 / 1362) / 54% (2236 / 1868); strikes 1037 / 1299 | **works** |
+| `F_PAIR_SEP` | teammates travelling side by side with nothing to eat split up | it fires ~450 times a game and the pair does part (2.1 -> 4.9 tiles apart within 6 rounds, 18% together again); idle paired turns overall 14674 / 15062 (noise level): new pairs keep forming. Its side effect, cancelling two thirds of scout trips, is fixed by `F_SCOUT_FIX` | **mechanism works, no measurable effect** |
+| `F_CHOKE_LOOP` | stop the split-and-die loop in slithery_fight's spawn corridor | slithery_fight: rescue splits 3618 / 3926, the busiest tile 373 / 491 (4 games); the busiest tiles are still the two corridor ends (16,7) and (23,7), 80-110 tip splits a game each: since v5.8 these are intended farm dives (they pay: 2.44 pearls eaten against 2.02 lost a dive on slithery_fight, 3.7 against 2.1 on trauma and stronghold) | **partial; superseded by `F_FARM`** |
+| `F_REM_COMMIT` | keep the remembered pearl we set off for | turns whose remembered target changed from the turn before 15.7% / 18.3% | **works, weakly** |
+| `F_CHAMBER_ONE` | two dragons never go into one small chamber in the same round | two of ours entering one chamber within a round 55 / 49. Default (18): 12 came in through the room's other portal (`chamber_taken()` only looks at the portal it is about to use; default's rooms have two). Portals (32): the 2x2 loop chambers, where re-entering is exempt by design | **no measurable effect** (not fixed here: it needs every portal of a room, which the v5.2 audit is changing, `F_RESERVE_ALL`) |
 | `F_RENDEZVOUS` | be at a cluster of tiles due to spawn together when it spawns, and eat it | 8847 trips in 48 games; 19% on time; 83% ate nothing at the cluster, 0.34 pearls a trip. Pearls eaten by the team 33753 / 33689 | **does not work** -> fixed (`F_RDV_FIX`) |
 
 ### F_RENDEZVOUS: late by design, and the fix
