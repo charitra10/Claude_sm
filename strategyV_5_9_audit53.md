@@ -1,10 +1,11 @@
-# Strategy v5.9e: do the v5.3 modules do what they were built for?
+# v5.9 audit53: do the v5.3 modules do what they were built for?
 
 v5.3 added eight switchable modules (`strategyV_5_3.md`). Each was kept or dropped on its win-rate ablation, and nobody
 checked whether it still did its job. v5.9 has grown about 50 modules on top of them since. This audit measures each v5.3
 module's intended effect directly, on replays and traces, with the module on and off. Where a module does not do its job,
-it finds out why and fixes it in `v5.9/main.cpp` (the "v5.9e" flag block below `PORTAL_RESIDENCY`). The v5.2 modules are
-audited separately (`strategyV_5_9d.md`, another branch). The two change sets merge cleanly.
+it finds out why and fixes it in `v5.9/main.cpp` (the "audit53" flag block below `PORTAL_RESIDENCY`). Other sessions audit the
+other versions' modules on their own branches: v5.2 (`strategyV_5_9d.md`), v5.4 (`strategyV_5_9_audit54.md`), v5.5-v5.7
+(`strategyV_5_9e.md`) and v5.6 (`strategyV_5_9_audit56.md`). This change set merges cleanly with each of them.
 
 ## Method
 
@@ -14,7 +15,7 @@ audited separately (`strategyV_5_9d.md`, another branch). The two change sets me
   the ladder and skipped), seeds 1-3, both sides: 78 games per variant, the same games for every variant.
 - **Metrics:** `audit53/metrics.py` measures what happened on the board, from the replays. `audit53/diagstats.py` measures
   what the trigger points did, from the traces. Summaries are in `audit53/results/`.
-- **Win rates:** measured separately with `seedbench.py` on fresh seeds (101-108), in `bench59e/`.
+- **Win rates:** measured separately with `seedbench.py` on fresh seeds (101-108), in `bench_audit53/`.
 
 ## Verdicts
 
@@ -172,20 +173,21 @@ The v5.9d branch changes which pockets count as hazards (`F_HAZARD_CLOSED`); thi
 ## Win rates (fresh seeds 101-108, 13 ladder maps, both sides)
 
 Seeds 101-108 were not used in the audit. Games that decide themselves by seat (8/16 on a map) are common in the
-mirror matchups. Raw results are in `bench59e/`; summarise them with `audit53/winrates.py FILE --per-map`.
+mirror matchups. Raw results are in `bench_audit53/`; summarise them with `audit53/winrates.py FILE --per-map`. There, the
+audit53 build is recorded as challenger `v5.9e` (its scratch directory name at the time).
 
 | matchup | score | |
 |---|---|---|
-| v5.9e (all fixes) vs original v5.9 | 105/208, **50.5%** (±3.5) | `full_101.jsonl` |
-| v5.9e without `F_STRADDLE_SEEN` vs original v5.9 | 104/208, 50.0% (±3.5) | `fx_noSEEN_101.jsonl` |
-| v5.9e without `F_BREAKOUT_HOLD` vs original v5.9 | 105/208, 50.5% (±3.5) | `fx_noHOLD_101.jsonl` |
-| v5.9e without `F_HEIR_BEAM` vs original v5.9 | 105/208, 50.5% (±3.5) | `fx_noHEIR_101.jsonl` |
-| v5.9e vs v5.8 | 133.5/208, **64.2%** (±3.3) | `full_101.jsonl` |
+| v5.9 + audit53 fixes vs original v5.9 | 105/208, **50.5%** (±3.5) | `full_101.jsonl` |
+| audit53 build without `F_STRADDLE_SEEN` vs original v5.9 | 104/208, 50.0% (±3.5) | `fx_noSEEN_101.jsonl` |
+| audit53 build without `F_BREAKOUT_HOLD` vs original v5.9 | 105/208, 50.5% (±3.5) | `fx_noHOLD_101.jsonl` |
+| audit53 build without `F_HEIR_BEAM` vs original v5.9 | 105/208, 50.5% (±3.5) | `fx_noHEIR_101.jsonl` |
+| audit53 build vs v5.8 | 133.5/208, **64.2%** (±3.3) | `full_101.jsonl` |
 | original v5.9 vs v5.8 (same seeds) | 129/208, **62.0%** (±3.4) | `orig_v58_101.jsonl` |
 
-Per map against v5.8 (out of 16, v5.9e / original v5.9):
+Per map against v5.8 (out of 16, audit53 build / original v5.9):
 
-| map | v5.9e | orig | map | v5.9e | orig |
+| map | audit53 | orig | map | audit53 | orig |
 |---|---|---|---|---|---|
 | autarky | 11.5 | 10 | schooltime | 9 | 9 |
 | default | 10 | 11 | slithery_fight | 7 | 10 |

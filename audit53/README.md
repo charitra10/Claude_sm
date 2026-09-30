@@ -2,7 +2,7 @@
 
 These tools check whether each v5.3 module (`F_REPEL`, `F_CYCLE2`, `F_PORTAL_FIX`, `F_ALPHA_PORTAL`, `F_STRADDLE`,
 `F_HANDOVER`, `F_LONG_PORTAL`, `F_HAZARD_RR`) does what it was built to do, measured on replays and traces rather than
-on win rate. Findings and numbers are in `strategyV_5_9e.md`. The summary outputs are in `results/`. The replays and traces
+on win rate. Findings and numbers are in `strategyV_5_9_audit53.md`. The summary outputs are in `results/`. The replays and traces
 (about 270 MB per 78-game set) are not committed; regenerate them with the steps below.
 
 - `mkvariant.sh SRC DEST [diag|instr] [FLAG=value ...]`: copy a bot and rewrite `constexpr` flags. `instr` also applies

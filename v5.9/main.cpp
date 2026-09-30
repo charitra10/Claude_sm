@@ -63,7 +63,7 @@ constexpr int LONG_PORTAL_LEN = 8, ALPHA_PORTAL_ROUND = 50, FRIEND_PORTAL_TTL = 
 // rounds; it still shuns the portal it came through for 20 rounds (no ping-pong). 4 = the same with nothing due within 40
 // (schooltime's rooms spawn on long timers: mode 3 let dragons walk out of them, seed 702 lost with it, won with mode 2).
 constexpr int PORTAL_RESIDENCY = 4;
-// v5.9e: fixes from the behavioural audit of the v5.3 modules (audit53/, strategyV_5_9e.md), switchable the same way.
+// audit53: fixes from the behavioural audit of the v5.3 modules (audit53/, strategyV_5_9_audit53.md), switchable the same way.
 // F_STRADDLE: 152 splits (child > 2) in 78 games had the body across a portal. A split child whose parent straddled one is
 // born straddling it; it never crossed, and the segment facing across was out of view, so it split again straight away
 // (slithery_fight: a chain of 10-long children every 2 rounds, each 2-long head dying within 4 rounds). Now a body chain
@@ -2563,7 +2563,7 @@ class Brain {
 
     // Leave the loop the last `span` positions traced: head away from its centroid for 10 rounds.
     void break_loop(int span) {
-        // v5.9e (F_BREAKOUT_HOLD): circling on purpose is not a loop: a rendezvous that is not due yet (F_RENDEZVOUS), the
+        // audit53 (F_BREAKOUT_HOLD): circling on purpose is not a loop: a rendezvous that is not due yet (F_RENDEZVOUS), the
         // endgame feed, an ambush waiting for its enemy. 42% of breakouts broke one of these.
         if (F_BREAKOUT_HOLD && (s.rdv_goal >= 0 || round >= feed_round() || s.last_mode == Mode::Ambush)) return;
         int n = static_cast<int>(s.recent_path.size());
@@ -3491,7 +3491,7 @@ class Brain {
             if (!part || part->get_id() != c.get_id() || part->is_head()) continue;
             if (s.cells[index(t.get_position())].edge[di(part->get_dir())] > 0) return true;
         }
-        // v5.9e (F_STRADDLE_SEEN): born straddling (our parent's body crossed a portal), with the segment that faces across
+        // audit53 (F_STRADDLE_SEEN): born straddling (our parent's body crossed a portal), with the segment that faces across
         // out of view. The visible chain from the head stops short of our length at a segment whose neighbours are all in
         // view, so the next segment toward the tail is behind a portal edge.
         if (F_STRADDLE_SEEN) {
@@ -3501,7 +3501,7 @@ class Brain {
         return false;
     }
 
-    // v5.9e (F_HEIR_BEAM): a straight beam from our head (not the one into our own neck) ends on teammate `id` within view.
+    // audit53 (F_HEIR_BEAM): a straight beam from our head (not the one into our own neck) ends on teammate `id` within view.
     bool beam_hits_friend(int id) const {
         int back = (di(c.get_dir()) + 2) % 4;
         for (int d = 0; d < 4; ++d) {
@@ -5910,7 +5910,7 @@ class Brain {
             }
         }
 
-        // v5.9e (F_BREAKOUT_HOLD): a loop breakout (F_CYCLE2) is not overridden by the errands below.
+        // audit53 (F_BREAKOUT_HOLD): a loop breakout (F_CYCLE2) is not overridden by the errands below.
         bool breakout = F_CYCLE2 && F_BREAKOUT_HOLD && round < s.cycle_break_until;
         // v5.8: nothing to eat in view and no errand: a farm nobody works (ours, or its mirror image) comes first.
         if (F_FARM_SEEK && !breakout && !target && !feed && !threatened && !s.alpha && !s.resident && !s.camping && !s.evacuating &&
@@ -5967,7 +5967,7 @@ class Brain {
         bool patrol_only = false;
         if (!target && !feed && !threatened && !(receiver_alpha && round >= feed_start && !friends.empty()) &&
             dist(here, s.sector_target) > 2) {
-            // v5.9e (F_BREAKOUT_HOLD): a breakout walks for its breakout point; the exploration score (tile age up to 56,
+            // audit53 (F_BREAKOUT_HOLD): a breakout walks for its breakout point; the exploration score (tile age up to 56,
             // progress toward the point at most 9) kept it among the loop's neighbours.
             target = breakout ? std::nullopt : exploration_target();
             if (!target) target = s.sector_target;
