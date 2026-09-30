@@ -30,6 +30,9 @@ on win rate. Findings and numbers are in `strategyV_5_9e.md`. The summary output
 - `events.py KIND DIR`: lists `strad` (straddle splits), `xlong` (long crossings) or `honone` (failed handovers), each
   with the dragon's trace line for that round.
 - `cmp.py KEYS DIR... [--per-map]`: puts `metrics.py` numbers from several directories side by side.
+- `resume_bench.py CHALLENGER OPP... --out FILE ...`: `seedbench.py` with resume. It skips games already in `--out`, so a
+  benchmark cut short (for example by a container restart) continues where it stopped.
+- `winrates.py FILE [--per-map]`: seedbench JSON-lines as a score per opponent (and per map), with one standard error.
 
 Typical run (the opponent is v5.8, so every `DIAG` line comes from the bot under test):
 

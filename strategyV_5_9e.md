@@ -171,7 +171,35 @@ The v5.9d branch changes which pockets count as hazards (`F_HAZARD_CLOSED`); thi
 
 ## Win rates (fresh seeds 101-108, 13 ladder maps, both sides)
 
-WINRATE_TABLE
+Seeds 101-108 were not used in the audit. Games that decide themselves by seat (8/16 on a map) are common in the
+mirror matchups. Raw results are in `bench59e/`; summarise them with `audit53/winrates.py FILE --per-map`.
+
+| matchup | score | |
+|---|---|---|
+| v5.9e (all fixes) vs original v5.9 | 105/208, **50.5%** (±3.5) | `full_101.jsonl` |
+| v5.9e without `F_STRADDLE_SEEN` vs original v5.9 | 104/208, 50.0% (±3.5) | `fx_noSEEN_101.jsonl` |
+| v5.9e without `F_BREAKOUT_HOLD` vs original v5.9 | 105/208, 50.5% (±3.5) | `fx_noHOLD_101.jsonl` |
+| v5.9e without `F_HEIR_BEAM` vs original v5.9 | 105/208, 50.5% (±3.5) | `fx_noHEIR_101.jsonl` |
+| v5.9e vs v5.8 | 133.5/208, **64.2%** (±3.3) | `full_101.jsonl` |
+| original v5.9 vs v5.8 (same seeds) | 129/208, **62.0%** (±3.4) | `orig_v58_101.jsonl` |
+
+Per map against v5.8 (out of 16, v5.9e / original v5.9):
+
+| map | v5.9e | orig | map | v5.9e | orig |
+|---|---|---|---|---|---|
+| autarky | 11.5 | 10 | schooltime | 9 | 9 |
+| default | 10 | 11 | slithery_fight | 7 | 10 |
+| devil | 8 | 8 | small | 14 | 14 |
+| dilemma | 16 | 16 | stronghold | 7 | 10 |
+| portals | 11 | 3 | trauma | 11 | 7 |
+| queen_of_spades | 11 | 10 | trophy | 9 | 9 |
+| queen_of_spades_but_she_ages | 9 | 12 | | | |
+
+**Bottom line:** the fixes make the modules do what they were built for, but they do not measurably change the win rate.
+Against the original it is 50.5%, and every single-fix ablation is 50.0-50.5%. Against v5.8 it is +2.2 points, which
+is within noise. No improvement is claimed. The portals gain (11 vs 3 of 16) is the largest per-map difference and fits
+the straddle and long-portal findings, but it is one map of 13, with slithery_fight and stronghold moving 3 games the
+other way. Confirm it on more seeds before relying on it.
 
 ## Changes in `v5.9/main.cpp`
 
