@@ -113,7 +113,28 @@ on-time trip), team pearls 34983.
 
 ## Win rate
 
-(pending: `bench59e/wr1_*.jsonl`)
+`seedbench.py`, plain builds against v5.8, fresh seeds 1001-1008, the 12 ladder maps, both sides (192 games each). Raw:
+`bench59e/wr1_*.jsonl`; `audit55/wr.py` prints the table and the paired counts.
+
+| map | v5.9 | + harvest, scout fixes | same, scouting off | **+ rendezvous fix (all fixes)** |
+|---|---|---|---|---|
+| autarky | 11 | 11.5 | 11 | 13 |
+| default | 10 | 9 | 12 | 11 |
+| devil | 9 | 10 | 9 | 9 |
+| dilemma | 16 | 16 | 14 | 16 |
+| portals | 12 | 11 | 8 | 11 |
+| queen_of_spades | 10 | 11 | 11 | 14 |
+| queen_of_spades_but_she_ages | 10 | 12 | 12 | 11 |
+| schooltime | 9 | 9 | 11 | 10 |
+| slithery_fight | 10 | 6 | 9 | 8 |
+| stronghold | 7 | 13 | 7 | 8 |
+| trauma | 9 | 10 | 11 | 8 |
+| trophy | 9 | 10 | 8 | 9 |
+| **all** | **122/192 (63.5%)** | 128.5 (66.9%) | 123 (64.1%) | **128 (66.7%)** |
+
+Paired on the same games, the fixed build wins 29 games v5.9 loses and loses 23 that v5.9 wins (z = 0.8): the fixes make
+the modules do their job without costing win rate, and the gain is within noise. Switching scouting off (with the other
+fixes on) is no better (123), so scouting stays on with its fix. A second seed set is in `bench59e/wr2_*.jsonl`.
 
 ## Code changes in v5.9/main.cpp
 

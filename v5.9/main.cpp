@@ -110,6 +110,12 @@ constexpr int SCOUT_ARRIVE = 4, SCOUT_REST = 10;
 // route over the remembered map, and a trip starts (and goes on) only if it arrives within RDV_LATE rounds of the spawn.
 constexpr bool F_RDV_FIX = true;
 constexpr int RDV_LATE = 2;
+// F_FARMSEEK_FIX (F_FARM_SEEK, v5.8): of 776 farm trips that ended in 48 games, 69 reached the farm (stronghold 0 of 237,
+// trauma 0 of 55); 10% of trips ate 2+ pearls there. Trips were timed and chosen by straight-line distance (stronghold's farm
+// is 3 tiles from open ground through kelp and 20 moves round), and went on to farms a teammate was diving (its mouth is no
+// place to wait). Now the walk is the route over the remembered map, portals we know included, and a farm with one of ours
+// visibly inside is dropped.
+constexpr bool F_FARMSEEK_FIX = false; // tried: arrivals 69 -> 26, paid trips 212 -> 74 (48 games); not shipped
 
 // v5.6 modules, switchable the same way.
 constexpr bool F_DRY_EVICT = true;    // leave a portal chamber at once when no pearl lies in it and none is due soon
@@ -4112,7 +4118,8 @@ class Brain {
             const auto &f = s.farms[s.farm_goal];
             Position a = farm_approach(f);
             bool there = here == a || here == f.p || (distance[index(f.p)] < INF && distance[index(f.p)] <= 4);
-            if (round > s.farm_goal_until || f.value == 0 || there) {
+            bool busy = F_FARMSEEK_FIX && f.dir >= 0 && c.get_tile(f.p) && pocket_busy(f.p, f.dir);
+            if (round > s.farm_goal_until || f.value == 0 || there || busy) {
                 DIAG("farmdone " << c.get_id() << ' ' << round << ' ' << f.p.x << ',' << f.p.y << " k " << dist(here, f.p)
                                  << " there " << there << " v " << f.value);
                 s.farm_goal = -1;
@@ -4128,6 +4135,12 @@ class Brain {
             if (round - f.claim_round <= FARM_CLAIM_TTL && f.claim_id != (c.get_id() & 4095)) continue;
             Position a = farm_approach(f);
             int k = dist(here, a);
+            if (F_FARMSEEK_FIX) {
+                if (f.dir >= 0 && c.get_tile(f.p) && pocket_busy(f.p, f.dir)) continue;
+                memory_bfs();
+                if (mem_depth[index(a)] >= INF) continue;
+                k = mem_depth[index(a)];
+            }
             if (k < 2 || k > (w + h) / 2) continue;
             if (distance[index(f.p)] < INF && distance[index(f.p)] <= 4) continue; // already here
             bool nearer = false;
@@ -4141,6 +4154,7 @@ class Brain {
         f.claim_round = round;
         f.claim_id = c.get_id() & 4095;
         int k = dist(here, farm_approach(f));
+        if (F_FARMSEEK_FIX) k = mem_depth[index(farm_approach(f))];
         s.farm_goal = best;
         s.farm_goal_until = round + 2 * k + 12;
         s.farm_claim_send = round;
